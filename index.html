@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notion Widgets — Gallery</title>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #f7f6f3;
+      --surface: #ffffff;
+      --border:  #e3e2df;
+      --text:    #37352f;
+      --muted:   #787774;
+      --accent:  #2eaadc;
+      --radius:  10px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      min-height: 100vh;
+      padding: 2.5rem 2rem 4rem;
+    }
+
+    /* ── Header ─────────────────────────────── */
+    header {
+      max-width: 960px;
+      margin: 0 auto 2.5rem;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .header__left h1 {
+      font-size: 1.9rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .header__left p {
+      margin-top: 0.35rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .header__badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: #e8f5fb;
+      color: var(--accent);
+      border: 1px solid #c2e4f5;
+      padding: 0.3em 0.75em;
+      border-radius: 99px;
+      white-space: nowrap;
+    }
+
+    /* ── Grid ───────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 1.5rem;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* ── Card ───────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      transition: box-shadow 0.15s ease, transform 0.15s ease;
+    }
+
+    .card:hover {
+      box-shadow: 0 6px 20px rgba(0,0,0,0.10);
+      transform: translateY(-1px);
+    }
+
+    .card__preview {
+      width: 100%;
+      height: 190px;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      background: #fafaf9;
+      display: block;
+    }
+
+    .card__body {
+      padding: 1rem 1rem 1.1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      flex: 1;
+    }
+
+    .card__name {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .card__desc {
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .card__url {
+      font-size: 0.72rem;
+      color: var(--muted);
+      word-break: break-all;
+      font-family: "SF Mono", "Fira Code", monospace;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 0.35em 0.5em;
+      margin-top: 0.15rem;
+    }
+
+    .card__actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.3rem;
+    }
+
+    /* ── Buttons ────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3em;
+      padding: 0.4em 0.85em;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      text-decoration: none;
+      color: var(--text);
+      background: var(--bg);
+      transition: background 0.1s, color 0.1s;
+      white-space: nowrap;
+    }
+
+    .btn:hover { background: #efefed; }
+
+    .btn--primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    .btn--primary:hover { background: #2596c4; }
+
+    .btn--primary.is-copied {
+      background: #22c55e;
+      pointer-events: none;
+    }
+
+    /* ── Empty state ────────────────────────── */
+    .empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 4rem 1rem;
+      color: var(--muted);
+    }
+
+    .empty p { margin-top: 0.5rem; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header__left">
+      <h1>Notion Widgets</h1>
+      <p>Click <strong>Copy URL</strong>, then paste into a Notion <code>/embed</code> block.</p>
+    </div>
+    <span class="header__badge" id="widget-count"></span>
+  </header>
+
+  <div class="grid" id="gallery"></div>
+
+  <script>
+    // ─────────────────────────────────────────────────────────────
+    //  WIDGET REGISTRY
+    //  Add one line here each time you create a new widget.
+    //
+    //  slug  → folder name under widgets/
+    //  name  → display label in the gallery
+    //  desc  → one-line description shown on the card
+    // ─────────────────────────────────────────────────────────────
+    const WIDGETS = [
+      { slug: 'clock', name: 'Clock', desc: 'Live time & date display' },
+      // { slug: 'my-widget', name: 'My Widget', desc: 'What it does' },
+    ];
+
+    // Works for both localhost and any GitHub Pages path depth
+    const base = location.origin +
+      location.pathname.replace(/\/?index\.html$/, '').replace(/\/$/, '');
+
+    // Badge
+    const count = WIDGETS.length;
+    document.getElementById('widget-count').textContent =
+      `${count} widget${count !== 1 ? 's' : ''}`;
+
+    const gallery = document.getElementById('gallery');
+
+    if (count === 0) {
+      gallery.innerHTML = `
+        <div class="empty">
+          <strong>No widgets yet</strong>
+          <p>Add an entry to the WIDGETS array in index.html to get started.</p>
+        </div>`;
+    }
+
+    WIDGETS.forEach(({ slug, name, desc }) => {
+      const widgetURL = `${base}/widgets/${slug}/`;
+
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <iframe
+          class="card__preview"
+          src="widgets/${slug}/index.html"
+          title="${name}"
+          loading="lazy"
+          sandbox="allow-scripts allow-same-origin"
+        ></iframe>
+        <div class="card__body">
+          <div class="card__name">${name}</div>
+          ${desc ? `<div class="card__desc">${desc}</div>` : ''}
+          <div class="card__url">${widgetURL}</div>
+          <div class="card__actions">
+            <a class="btn" href="widgets/${slug}/index.html" target="_blank">Open ↗</a>
+            <button class="btn btn--primary" data-url="${widgetURL}">Copy URL</button>
+          </div>
+        </div>
+      `;
+
+      card.querySelector('.btn--primary').addEventListener('click', function () {
+        navigator.clipboard.writeText(this.dataset.url).then(() => {
+          this.textContent = 'Copied!';
+          this.classList.add('is-copied');
+          setTimeout(() => {
+            this.textContent = 'Copy URL';
+            this.classList.remove('is-copied');
+          }, 2000);
+        });
+      });
+
+      gallery.appendChild(card);
+    });
+  </script>
+
+</body>
+</html>

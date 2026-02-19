@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Personal Notion widgets hosted on GitHub Pages",
   "scripts": {
-    "dev": "live-server --port=3000 --open=gallery.html",
+    "dev": "live-server --port=3000 --open=index.html",
     "preview": "live-server --port=3000"
   },
   "devDependencies": {

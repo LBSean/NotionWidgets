@@ -16,7 +16,7 @@ Paste any of these URLs into a Notion `/embed` block.
 
 ```bash
 npm install          # first time only
-npm run dev          # opens gallery at http://localhost:3000/gallery.html
+npm run dev          # opens gallery at http://localhost:3000
 ```
 
 The gallery auto-reloads on every file save and previews every widget in a card with a one-click "Copy URL" button.
@@ -32,7 +32,7 @@ The gallery auto-reloads on every file save and previews every widget in a card 
 
 2. **Build it** — edit `widgets/my-widget/index.html`. Use `../../shared/base.css` for consistent resets and CSS variables.
 
-3. **Register it in the gallery** — open `gallery.html` and add an entry to the `WIDGETS` array:
+3. **Register it in the gallery** — open `index.html` and add an entry to the `WIDGETS` array:
    ```js
    { slug: 'my-widget', name: 'My Widget', desc: 'What it does' },
    ```
@@ -58,7 +58,7 @@ NotionWidgets/
 │       └── index.html          ← sample widget
 ├── shared/
 │   └── base.css                ← Notion-friendly resets + CSS variables
-├── gallery.html                ← local dev dashboard
+├── index.html                  ← widget gallery (live at lbsean.github.io/NotionWidgets/)
 ├── package.json
 └── .gitignore
 ```
@@ -86,7 +86,9 @@ GitHub Pages requires GitHub Pro for private repos, but Cloudflare Pages is free
 
 ## Widget checklist
 
-| Widget | Status | Notion URL |
-|--------|--------|------------|
-| Clock  | ✅     | `…/widgets/clock/` |
+Browse and copy embed URLs from the **[live gallery →](https://lbsean.github.io/NotionWidgets/)**
+
+| Widget | Status | Notion embed URL |
+|--------|--------|------------------|
+| [Clock](https://lbsean.github.io/NotionWidgets/widgets/clock/) | ✅ | `https://lbsean.github.io/NotionWidgets/widgets/clock/` |
 
