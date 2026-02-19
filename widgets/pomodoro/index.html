@@ -29,6 +29,13 @@
       --c-surface: #e0f9ed;
       --c-border:  #b5e8d0;
     }
+    [data-mode="eyeBreak"] {
+      --c-accent:  #f59e0b;
+      --c-bg:      #fffbf0;
+      --c-text:    #2d1f00;
+      --c-surface: #fef3c7;
+      --c-border:  #fde68a;
+    }
 
     /* ── Layout ───────────────────────────────────────────────── */
     body {
@@ -183,6 +190,41 @@
       margin: 1.4rem 0 0.8rem;
     }
 
+    /* ── Preset buttons ───────────────────────────────────────── */
+    .presets {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.4rem;
+      margin-bottom: 0.9rem;
+    }
+    .preset-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.15rem;
+      padding: 0.55em 0.4em;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 8px;
+      background: #f9f9f9;
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #555;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    .preset-btn span {
+      font-size: 0.68rem;
+      font-weight: 400;
+      color: #aaa;
+    }
+    .preset-btn.is-active {
+      border-color: #4a9eda;
+      background: #e8f4fd;
+      color: #1a6ea8;
+    }
+    .preset-btn.is-active span { color: #4a9eda; }
+    .preset-btn:hover:not(.is-active) { border-color: #bbb; background: #f0f0f0; }
+
     .field {
       display: flex;
       align-items: center;
@@ -204,6 +246,55 @@
       font-size: 0.88rem;
     }
     .field .unit { font-size: 0.75rem; color: #aaa; }
+
+    /* Toggle switch */
+    .toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.65rem;
+    }
+    .toggle-wrap label {
+      flex: 1;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: #444;
+    }
+    .toggle {
+      position: relative;
+      width: 38px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      border-radius: 99px;
+      background: #ddd;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      left: 3px;
+      top: 3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .toggle-track { background: #4a9eda; }
+    .toggle input:checked + .toggle-track::after { transform: translateX(16px); }
+
+    .micro-fields {
+      padding-left: 0.25rem;
+      border-left: 2px solid #f0f0f0;
+      margin-bottom: 0.5rem;
+    }
+    .micro-fields.is-hidden { display: none; }
 
     .field--col {
       display: flex;
@@ -326,6 +417,19 @@
       <h2>Settings</h2>
     </div>
 
+    <p class="section-title">Session Preset</p>
+    <div class="presets">
+      <button class="preset-btn" data-preset="standard" type="button">
+        Standard<span>25 / 5</span>
+      </button>
+      <button class="preset-btn" data-preset="long" type="button">
+        Long Focus<span>50 / 10</span>
+      </button>
+      <button class="preset-btn" data-preset="custom" type="button">
+        Custom<span>your values</span>
+      </button>
+    </div>
+
     <p class="section-title">Timer Durations</p>
     <div class="field">
       <label for="sWork">Work</label>
@@ -345,6 +449,27 @@
     <div class="field">
       <label for="sSessions">Sessions before long break</label>
       <input type="number" id="sSessions" min="2" max="8" value="4" />
+    </div>
+
+    <p class="section-title">Eye-Rest Micro-Breaks</p>
+    <div class="toggle-wrap">
+      <label for="sMicroEn">Enable micro-breaks</label>
+      <label class="toggle">
+        <input type="checkbox" id="sMicroEn" />
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+    <div class="micro-fields is-hidden" id="microFields">
+      <div class="field">
+        <label for="sMicroInt">Remind me every</label>
+        <input type="number" id="sMicroInt" min="15" max="240" value="60" />
+        <span class="unit">min work</span>
+      </div>
+      <div class="field">
+        <label for="sMicroDur">Eye-rest duration</label>
+        <input type="number" id="sMicroDur" min="1" max="15" value="5" />
+        <span class="unit">min</span>
+      </div>
     </div>
 
     <p class="section-title">Notion Logging</p>
@@ -371,22 +496,28 @@
 
   <script>
     // ── Defaults & config ─────────────────────────────────────
-    const DEFAULTS = { work: 25, short: 5, long: 15, sessions: 4, webhook: '', label: '' };
+    const DEFAULTS = {
+      work: 25, short: 5, long: 15, sessions: 4,
+      microEn: false, microInt: 60, microDur: 5,
+      webhook: '', label: '',
+    };
     let cfg = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('pomo-cfg') || '{}') };
 
     const MODES = {
-      work:  { label: 'Work Session', dataMode: 'work',      dur: () => cfg.work  },
-      short: { label: 'Short Break',  dataMode: 'break',     dur: () => cfg.short },
-      long:  { label: 'Long Break',   dataMode: 'longBreak', dur: () => cfg.long  },
+      work:     { label: 'Work Session',  dataMode: 'work',      dur: () => cfg.work     },
+      short:    { label: 'Short Break',   dataMode: 'break',     dur: () => cfg.short    },
+      long:     { label: 'Long Break',    dataMode: 'longBreak', dur: () => cfg.long     },
+      eyeBreak: { label: '👁 Eye Rest',   dataMode: 'eyeBreak',  dur: () => cfg.microDur },
     };
 
     // ── State ─────────────────────────────────────────────────
-    let mode         = 'work';
-    let remaining    = cfg.work * 60;
+    let mode              = 'work';
+    let remaining         = cfg.work * 60;
     let completedSessions = 0;
-    let running      = false;
-    let tickId       = null;
-    let audioCtx     = null;
+    let cumulativeWorkMin = 0; // tracks work minutes for micro-break
+    let running           = false;
+    let tickId            = null;
+    let audioCtx          = null;
 
     // ── DOM refs ──────────────────────────────────────────────
     const displayEl   = document.getElementById('display');
@@ -399,11 +530,11 @@
     function render() {
       const m = String(Math.floor(remaining / 60)).padStart(2, '0');
       const s = String(remaining % 60).padStart(2, '0');
-      displayEl.textContent  = `${m}:${s}`;
-      document.title         = `${m}:${s} – ${MODES[mode].label}`;
-      modeLabelEl.textContent = MODES[mode].label;
+      displayEl.textContent      = `${m}:${s}`;
+      document.title             = `${m}:${s} – ${MODES[mode].label}`;
+      modeLabelEl.textContent    = MODES[mode].label;
       document.body.dataset.mode = MODES[mode].dataMode;
-      startBtn.textContent   = running ? 'Pause' : 'Start';
+      startBtn.textContent       = running ? 'Pause' : 'Start';
 
       dotsEl.innerHTML = '';
       for (let i = 0; i < cfg.sessions; i++) {
@@ -451,17 +582,23 @@
       if (mode === 'work') {
         logSession();
         completedSessions++;
-        if (completedSessions >= cfg.sessions) {
-          completedSessions = 0;
-          switchMode('long');
+        cumulativeWorkMin += cfg.work;
+
+        const isLongBreak = completedSessions >= cfg.sessions;
+        if (isLongBreak) completedSessions = 0;
+
+        // Micro-break overrides short breaks (not long breaks)
+        if (cfg.microEn && !isLongBreak && cumulativeWorkMin >= cfg.microInt) {
+          cumulativeWorkMin = 0;
+          switchMode('eyeBreak');
         } else {
-          switchMode('short');
+          switchMode(isLongBreak ? 'long' : 'short');
         }
       } else {
+        // After any break (including eye rest), go back to work
         switchMode('work');
       }
 
-      // Slight delay then auto-start
       setTimeout(start, 600);
     }
 
@@ -480,7 +617,6 @@
     function chime() {
       try {
         const ctx = getAudio();
-        // Ascending C-E-G-C chord arpeggio
         [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
           const osc  = ctx.createOscillator();
           const gain = ctx.createGain();
@@ -507,10 +643,13 @@
 
     function notify() {
       if ('Notification' in window && Notification.permission === 'granted') {
-        const body = mode === 'work'
-          ? 'Work session done — take a break!'
-          : 'Break over — time to focus!';
-        new Notification('Pomodoro', { body });
+        const msgs = {
+          work:     'Work session done — take a break!',
+          short:    'Break over — time to focus!',
+          long:     'Break over — time to focus!',
+          eyeBreak: 'Break over — time to focus!',
+        };
+        new Notification('Pomodoro', { body: msgs[mode] || 'Timer done!' });
       }
     }
 
@@ -539,21 +678,47 @@
       setTimeout(() => { logStatusEl.textContent = ''; }, 3500);
     }
 
-    // ── Settings ──────────────────────────────────────────────
+    // ── Settings form ─────────────────────────────────────────
+    const PRESETS = {
+      standard: { work: 25, short: 5,  long: 15 },
+      long:     { work: 50, short: 10, long: 20 },
+    };
+
+    function detectPreset() {
+      for (const [key, p] of Object.entries(PRESETS)) {
+        if (cfg.work === p.work && cfg.short === p.short && cfg.long === p.long) return key;
+      }
+      return 'custom';
+    }
+
+    function applyPresetButtons(active) {
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.classList.toggle('is-active', btn.dataset.preset === active);
+      });
+    }
+
     function loadForm() {
       document.getElementById('sWork').value     = cfg.work;
       document.getElementById('sShort').value    = cfg.short;
       document.getElementById('sLong').value     = cfg.long;
       document.getElementById('sSessions').value = cfg.sessions;
+      document.getElementById('sMicroEn').checked = cfg.microEn;
+      document.getElementById('sMicroInt').value = cfg.microInt;
+      document.getElementById('sMicroDur').value = cfg.microDur;
       document.getElementById('sWebhook').value  = cfg.webhook;
       document.getElementById('sLabel').value    = cfg.label;
+      document.getElementById('microFields').classList.toggle('is-hidden', !cfg.microEn);
+      applyPresetButtons(detectPreset());
     }
 
     function saveSettings() {
-      cfg.work     = Math.max(1, +document.getElementById('sWork').value     || 25);
-      cfg.short    = Math.max(1, +document.getElementById('sShort').value    || 5);
-      cfg.long     = Math.max(1, +document.getElementById('sLong').value     || 15);
-      cfg.sessions = Math.max(2, +document.getElementById('sSessions').value || 4);
+      cfg.work     = Math.max(1,  +document.getElementById('sWork').value     || 25);
+      cfg.short    = Math.max(1,  +document.getElementById('sShort').value    || 5);
+      cfg.long     = Math.max(1,  +document.getElementById('sLong').value     || 15);
+      cfg.sessions = Math.max(2,  +document.getElementById('sSessions').value || 4);
+      cfg.microEn  = document.getElementById('sMicroEn').checked;
+      cfg.microInt = Math.max(15, +document.getElementById('sMicroInt').value || 60);
+      cfg.microDur = Math.max(1,  +document.getElementById('sMicroDur').value || 5);
       cfg.webhook  = document.getElementById('sWebhook').value.trim();
       cfg.label    = document.getElementById('sLabel').value.trim();
       localStorage.setItem('pomo-cfg', JSON.stringify(cfg));
@@ -561,6 +726,30 @@
       reset();
       toast('Settings saved');
     }
+
+    // Preset button clicks
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.preset;
+        if (PRESETS[key]) {
+          const p = PRESETS[key];
+          document.getElementById('sWork').value  = p.work;
+          document.getElementById('sShort').value = p.short;
+          document.getElementById('sLong').value  = p.long;
+        }
+        applyPresetButtons(key);
+      });
+    });
+
+    // Mark "custom" when any duration field is manually edited
+    ['sWork', 'sShort', 'sLong'].forEach(id => {
+      document.getElementById(id).addEventListener('input', () => applyPresetButtons('custom'));
+    });
+
+    // Toggle micro-break fields visibility
+    document.getElementById('sMicroEn').addEventListener('change', function () {
+      document.getElementById('microFields').classList.toggle('is-hidden', !this.checked);
+    });
 
     const panel = document.getElementById('settingsPanel');
     document.getElementById('settingsBtn').addEventListener('click', () => { loadForm(); panel.classList.add('is-open'); });

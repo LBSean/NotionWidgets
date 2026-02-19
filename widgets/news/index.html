@@ -286,6 +286,7 @@
   <script>
     // ── Defaults ─────────────────────────────────────────────────
     const STORAGE_KEY = 'news-cfg';
+    const CACHE_TTL   = 15 * 60 * 1000; // 15 minutes
     const DEFAULT_FEEDS = [
       'https://feeds.bbci.co.uk/news/rss.xml',
       'https://feeds.apnews.com/rss/apf-topnews',
@@ -293,20 +294,32 @@
     ];
 
     let cfg = { feeds: [...DEFAULT_FEEDS], perPage: 5 };
-    // Loaded feed data: [{ name, articles }] — null if failed/empty
-    let feedData = [];
+    let feedData   = [];
     let currentFeed = 0;
 
     function loadCfg() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) cfg = { ...cfg, ...JSON.parse(raw) };
-        // Always ensure 3 slots
         while (cfg.feeds.length < 3) cfg.feeds.push('');
       } catch {}
     }
-    function saveCfg() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+    function saveCfg() { localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)); }
+
+    // ── Per-feed localStorage cache ───────────────────────────────
+    function cacheKey(url) {
+      return 'nf_' + url.replace(/[^a-z0-9]/gi, '_').slice(-48);
+    }
+    function getCached(url) {
+      try {
+        const raw = localStorage.getItem(cacheKey(url));
+        if (!raw) return null;
+        const { ts, data } = JSON.parse(raw);
+        return { data, stale: Date.now() - ts > CACHE_TTL };
+      } catch { return null; }
+    }
+    function setCache(url, data) {
+      try { localStorage.setItem(cacheKey(url), JSON.stringify({ ts: Date.now(), data })); } catch {}
     }
 
     // ── Helpers ──────────────────────────────────────────────────
@@ -320,66 +333,127 @@
       if (h < 24) return `${h}h ago`;
       return `${Math.floor(h / 24)}d ago`;
     }
-
     function escHtml(s) {
-      return String(s)
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
         .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
+    function stripTags(s) { return String(s).replace(/<[^>]+>/g, '').trim(); }
 
-    // ── Fetch & parse one RSS/Atom feed ──────────────────────────
-    async function fetchFeed(url) {
-      const res  = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+    // ── Fetch via rss2json.com (primary — returns clean JSON) ─────
+    async function fetchViaRss2Json(url, signal) {
+      const api = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=20`;
+      const res  = await fetch(api, { signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.status !== 'ok') throw new Error(json.message || 'Feed error');
+      const name = stripTags(json.feed?.title || '') || new URL(url).hostname;
+      const articles = (json.items || []).slice(0, 20).map(item => ({
+        title:   stripTags(item.title || '') || '(No title)',
+        link:    item.link  || '',
+        pubDate: item.pubDate || '',
+      }));
+      if (!articles.length) throw new Error('No items');
+      return { name, articles };
+    }
+
+    // ── Fetch via allorigins proxy (fallback) ─────────────────────
+    async function fetchViaProxy(url, signal) {
+      const res  = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, { signal });
       const json = await res.json();
       if (!json.contents) throw new Error('Empty proxy response');
-
       const doc    = new DOMParser().parseFromString(json.contents, 'text/xml');
       const isAtom = !!doc.querySelector('feed');
       const items  = [...doc.querySelectorAll(isAtom ? 'entry' : 'item')];
-      if (!items.length) throw new Error('No items in feed');
-
+      if (!items.length) throw new Error('No items');
       const name = doc.querySelector('channel > title, feed > title')?.textContent?.trim()
                 || new URL(url).hostname;
-
       const articles = items.slice(0, 20).map(item => {
         const title = item.querySelector('title')?.textContent?.trim() || '(No title)';
-        let link = isAtom
+        const link  = isAtom
           ? (item.querySelector('link[rel="alternate"]')?.getAttribute('href')
           || item.querySelector('link')?.getAttribute('href') || '')
           : (item.querySelector('link')?.textContent?.trim() || '');
         const pubDate = item.querySelector('pubDate, published, updated')?.textContent?.trim() || '';
         return { title, link, pubDate };
       });
-
       return { name, articles };
     }
 
-    // ── Load all feeds in parallel ────────────────────────────────
-    async function loadAllFeeds() {
+    // ── Fetch one feed (rss2json → fallback proxy, 8 s timeout) ──
+    async function fetchFeed(url) {
+      const ctrl    = new AbortController();
+      const timerId = setTimeout(() => ctrl.abort(), 8000);
+      try {
+        try {
+          const r = await fetchViaRss2Json(url, ctrl.signal);
+          clearTimeout(timerId);
+          return r;
+        } catch (e) {
+          if (e.name === 'AbortError') throw e;
+          const r = await fetchViaProxy(url, ctrl.signal);
+          clearTimeout(timerId);
+          return r;
+        }
+      } finally {
+        clearTimeout(timerId);
+      }
+    }
+
+    // ── Load all feeds (stale-while-revalidate) ───────────────────
+    async function loadAllFeeds(force = false) {
       const urls = cfg.feeds.filter(u => u.trim());
-      if (!urls.length) {
-        showStatus('Add feed URLs in settings ⚙');
-        openSettings();
+      if (!urls.length) { showStatus('Add feed URLs in settings ⚙'); openSettings(); return; }
+
+      const cached  = urls.map(url => force ? null : getCached(url));
+      const anyCached = cached.some(c => c !== null);
+      const allFresh  = anyCached && cached.every(c => c && !c.stale);
+
+      // Serve cache immediately if we have anything
+      if (anyCached && !force) {
+        feedData = cached.map((c, i) =>
+          c ? c.data : { name: new URL(urls[i]).hostname, articles: [] }
+        );
+        currentFeed = feedData.findIndex(f => f.articles.length > 0);
+        if (currentFeed >= 0) { renderFeed(); showMain(); }
+        else showStatus('Loading…');
+
+        if (allFresh) return; // Everything fresh — skip background refresh
+
+        // Background-refresh stale/missing feeds
+        setRefreshing(true);
+        await Promise.allSettled(
+          urls.map((url, i) => {
+            if (cached[i] && !cached[i].stale) return Promise.resolve();
+            return fetchFeed(url)
+              .then(data => { setCache(url, data); feedData[i] = data; })
+              .catch(() => {});
+          })
+        );
+        setRefreshing(false);
+        const cf = feedData.findIndex(f => f.articles.length > 0);
+        if (cf >= 0) { currentFeed = cf; renderFeed(); showMain(); }
         return;
       }
 
+      // No cache or forced refresh
       showStatus('Loading feeds…');
-      const results = await Promise.allSettled(urls.map(fetchFeed));
-
+      const results = await Promise.allSettled(
+        urls.map(url => fetchFeed(url).then(data => { setCache(url, data); return data; }))
+      );
       feedData = results.map((r, i) =>
         r.status === 'fulfilled' ? r.value : { name: new URL(urls[i]).hostname, articles: [], failed: true }
       );
-
-      const hasAny = feedData.some(f => f.articles.length > 0);
-      if (!hasAny) {
-        showStatus('Could not load any feeds. Check settings ⚙');
-        return;
+      if (!feedData.some(f => f.articles.length > 0)) {
+        showStatus('Could not load any feeds. Check settings ⚙'); return;
       }
-
-      // Start on first feed that has articles
       currentFeed = feedData.findIndex(f => f.articles.length > 0);
-      renderFeed();
-      showMain();
+      renderFeed(); showMain();
+    }
+
+    function setRefreshing(on) {
+      const btn = document.getElementById('refreshBtn');
+      btn.style.opacity  = on ? '0.45' : '1';
+      btn.title = on ? 'Refreshing in background…' : 'Refresh';
     }
 
     // ── Render current feed ───────────────────────────────────────
@@ -407,7 +481,6 @@
         });
       }
 
-      // Dots
       const dots = document.getElementById('sourceDots');
       dots.innerHTML = '';
       feedData.forEach((_, i) => {
@@ -440,8 +513,7 @@
 
     // ── Settings panel ───────────────────────────────────────────
     const panel = document.getElementById('settingsPanel');
-    const openSettings  = () => {
-      // Populate inputs
+    const openSettings = () => {
       cfg.feeds.forEach((url, i) => {
         const el = document.getElementById(`feed${i}`);
         if (el) el.value = url;
@@ -455,20 +527,19 @@
 
     document.getElementById('gearBtn').addEventListener('click', openSettings);
     document.getElementById('closeBtn').addEventListener('click', closeSettings);
-    document.getElementById('refreshBtn').addEventListener('click', loadAllFeeds);
+    document.getElementById('refreshBtn').addEventListener('click', () => loadAllFeeds(true));
 
     document.getElementById('perPageSlider').addEventListener('input', function() {
       document.getElementById('perPageVal').textContent = this.value;
     });
 
     document.getElementById('saveBtn').addEventListener('click', async () => {
-      cfg.feeds = [0,1,2].map(i => (document.getElementById(`feed${i}`)?.value.trim() || ''));
+      cfg.feeds  = [0,1,2].map(i => (document.getElementById(`feed${i}`)?.value.trim() || ''));
       cfg.perPage = parseInt(document.getElementById('perPageSlider').value, 10);
       saveCfg();
       closeSettings();
-      feedData = [];
-      currentFeed = 0;
-      await loadAllFeeds();
+      feedData = []; currentFeed = 0;
+      await loadAllFeeds(true);
     });
 
     // ── Init ─────────────────────────────────────────────────────

@@ -162,17 +162,17 @@
   <script>
     // ── Sound definitions ──────────────────────────────────────
     const SOUNDS = [
-      { id: 'rain',    icon: '🌧️', label: 'Rain',      color: '#74b9ff', vol: 0.55 },
-      { id: 'thunder', icon: '⛈️', label: 'Thunder',   color: '#a29bfe', vol: 0.60 },
-      { id: 'jungle',  icon: '🌿', label: 'Jungle',    color: '#55efc4', vol: 0.45 },
-      { id: 'coffee',  icon: '☕', label: 'Coffee Bar', color: '#fdcb6e', vol: 0.40 },
-      { id: 'snow',    icon: '❄️', label: 'Snow',      color: '#b2d8f7', vol: 0.30 },
-      { id: 'lofi',    icon: '🎵', label: 'Lofi',      color: '#fd79a8', vol: 0.38 },
+      { id: 'rain',    icon: '🌧️', label: 'Rain',       color: '#74b9ff', vol: 0.70 },
+      { id: 'thunder', icon: '⛈️', label: 'Thunder',    color: '#a29bfe', vol: 0.65 },
+      { id: 'jungle',  icon: '🌿', label: 'Jungle',     color: '#55efc4', vol: 0.55 },
+      { id: 'coffee',  icon: '☕', label: 'Coffee Bar',  color: '#fdcb6e', vol: 0.55 },
+      { id: 'snow',    icon: '❄️', label: 'Snow',       color: '#b2d8f7', vol: 0.50 },
+      { id: 'lofi',    icon: '🎵', label: 'Lofi',       color: '#fd79a8', vol: 0.55 },
     ];
 
-    let actx = null;
+    let actx      = null;
     let masterVol = 0.65;
-    const active = new Map(); // id → { gainNode, cleanup }
+    const active  = new Map(); // id → { gainNode, cleanup }
 
     function getCtx() {
       if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
@@ -180,72 +180,164 @@
       return actx;
     }
 
-    // ── Noise helpers ──────────────────────────────────────────
-    function noiseBuffer(ctx, secs = 2) {
-      const buf = ctx.createBuffer(1, ctx.sampleRate * secs, ctx.sampleRate);
-      const ch  = buf.getChannelData(0);
-      for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+    // ── Pink noise (Paul Kellett approximation) ────────────────
+    // Much more natural than white noise — rolls off at 3 dB/octave
+    function pinkNoiseBuffer(ctx, secs = 4) {
+      const frames = Math.floor(ctx.sampleRate * secs);
+      const buf    = ctx.createBuffer(1, frames, ctx.sampleRate);
+      const data   = buf.getChannelData(0);
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      for (let i = 0; i < frames; i++) {
+        const w = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + w * 0.0555179;
+        b1 = 0.99332 * b1 + w * 0.0750759;
+        b2 = 0.96900 * b2 + w * 0.1538520;
+        b3 = 0.86650 * b3 + w * 0.3104856;
+        b4 = 0.55000 * b4 + w * 0.5329522;
+        b5 = -0.7616 * b5 - w * 0.0168980;
+        b6 = w * 0.115926;
+        data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6) * 0.11;
+      }
       return buf;
     }
 
-    function noiseSource(ctx, secs) {
-      const src = ctx.createBufferSource();
-      src.buffer = noiseBuffer(ctx, secs);
+    function pinkSource(ctx, secs = 4) {
+      const src  = ctx.createBufferSource();
+      src.buffer = pinkNoiseBuffer(ctx, secs);
       src.loop   = true;
       return src;
+    }
+
+    // ── LFO helper ─────────────────────────────────────────────
+    function lfo(ctx, freqHz, depthVal, target) {
+      const osc = ctx.createOscillator();
+      const g   = ctx.createGain();
+      osc.frequency.value = freqHz;
+      g.gain.value        = depthVal;
+      osc.connect(g);
+      g.connect(target);
+      osc.start();
+      return osc;
     }
 
     // ── Sound scene builders ───────────────────────────────────
     const SCENES = {
 
+      // ── Rain ────────────────────────────────────────────────
       rain(ctx, out) {
-        const src = noiseSource(ctx);
-        const lp  = ctx.createBiquadFilter(); lp.type = 'lowpass';  lp.frequency.value = 1300;
-        const hp  = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 380;
-        src.connect(lp); lp.connect(hp); hp.connect(out);
+        // Primary shower layer: pink noise shaped to rain frequencies
+        const src  = pinkSource(ctx, 5);
+        const hp   = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 300;
+        const lp   = ctx.createBiquadFilter(); lp.type = 'lowpass';  lp.frequency.value = 2800;
+        const gain = ctx.createGain(); gain.gain.value = 0.8;
+        src.connect(hp); hp.connect(lp); lp.connect(gain); gain.connect(out);
         src.start();
-        return () => { try { src.stop(); } catch(e) {} };
+
+        // Lighter drizzle overtone layer
+        const src2  = pinkSource(ctx, 3);
+        const bp2   = ctx.createBiquadFilter(); bp2.type = 'bandpass'; bp2.frequency.value = 1400; bp2.Q.value = 0.6;
+        const gain2 = ctx.createGain(); gain2.gain.value = 0.35;
+        src2.connect(bp2); bp2.connect(gain2); gain2.connect(out);
+        src2.start();
+
+        // Slow LFO on shower gain — natural intensity variation
+        lfo(ctx, 0.06, 0.18, gain.gain);
+
+        // Scheduled drip accents (large drops hitting a surface)
+        let dead = false;
+        function drip() {
+          if (dead) return;
+          setTimeout(() => {
+            if (dead) return;
+            const t     = ctx.currentTime;
+            const pitch = 280 + Math.random() * 500;
+            const osc   = ctx.createOscillator();
+            const g     = ctx.createGain();
+            osc.frequency.setValueAtTime(pitch * 1.6, t);
+            osc.frequency.exponentialRampToValueAtTime(pitch * 0.65, t + 0.1);
+            g.gain.setValueAtTime(0.09, t);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+            osc.connect(g); g.connect(out);
+            osc.start(t); osc.stop(t + 0.16);
+            drip();
+          }, 600 + Math.random() * 2800);
+        }
+        drip();
+
+        return () => {
+          dead = true;
+          try { src.stop();  } catch(e) {}
+          try { src2.stop(); } catch(e) {}
+        };
       },
 
+      // ── Thunder ─────────────────────────────────────────────
       thunder(ctx, out) {
-        // Background rain
-        const rain = noiseSource(ctx);
-        const lp   = ctx.createBiquadFilter(); lp.type = 'lowpass';  lp.frequency.value = 900;
-        const hp   = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 200;
-        const rg   = ctx.createGain(); rg.gain.value = 0.6;
-        rain.connect(lp); lp.connect(hp); hp.connect(rg); rg.connect(out);
+        // Background rain (softer than rain scene)
+        const rain  = pinkSource(ctx, 5);
+        const rhp   = ctx.createBiquadFilter(); rhp.type = 'highpass'; rhp.frequency.value = 350;
+        const rlp   = ctx.createBiquadFilter(); rlp.type = 'lowpass';  rlp.frequency.value = 2200;
+        const rainG = ctx.createGain(); rainG.gain.value = 0.50;
+        rain.connect(rhp); rhp.connect(rlp); rlp.connect(rainG); rainG.connect(out);
         rain.start();
 
-        // Thunder rumbles
         let dead = false;
         function boom() {
           if (dead) return;
-          const delay = (5 + Math.random() * 14) * 1000;
+          const delay = (7 + Math.random() * 18) * 1000;
           setTimeout(() => {
             if (dead) return;
-            const rumble = noiseSource(ctx, 4);
-            const rlp    = ctx.createBiquadFilter(); rlp.type = 'lowpass'; rlp.frequency.value = 100;
+            const t    = ctx.currentTime;
+
+            // Optional lightning crack (high-freq burst, 50 % chance)
+            if (Math.random() > 0.5) {
+              const crack = pinkSource(ctx, 0.3);
+              const chp   = ctx.createBiquadFilter(); chp.type = 'highpass'; chp.frequency.value = 1800;
+              const cg    = ctx.createGain();
+              cg.gain.setValueAtTime(0.6, t);
+              cg.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+              crack.connect(chp); chp.connect(cg); cg.connect(out);
+              crack.start(t); crack.stop(t + 0.15);
+            }
+
+            // Rumble: low-frequency pink noise with rolling envelope
+            const rumble = pinkSource(ctx, 4);
+            const rlp2   = ctx.createBiquadFilter(); rlp2.type = 'lowpass'; rlp2.frequency.value = 120;
             const rg2    = ctx.createGain();
-            const t      = ctx.currentTime;
-            rg2.gain.setValueAtTime(0, t);
-            rg2.gain.linearRampToValueAtTime(1.8, t + 0.06);
-            rg2.gain.exponentialRampToValueAtTime(0.001, t + 3.5);
-            rumble.connect(rlp); rlp.connect(rg2); rg2.connect(out);
-            rumble.start(); rumble.stop(t + 4);
+            rg2.gain.setValueAtTime(0, t + 0.05);
+            rg2.gain.linearRampToValueAtTime(2.2, t + 0.18);
+            rg2.gain.setTargetAtTime(0.0001, t + 0.5, 0.8);
+            // LFO on filter for roll-off feel
+            lfo(ctx, 0.9, 40, rlp2.frequency);
+            rumble.connect(rlp2); rlp2.connect(rg2); rg2.connect(out);
+            rumble.start(t); rumble.stop(t + 5);
+
             boom();
           }, delay);
         }
         boom();
+
         return () => { dead = true; try { rain.stop(); } catch(e) {} };
       },
 
+      // ── Jungle ──────────────────────────────────────────────
       jungle(ctx, out) {
-        // Wind
-        const wind  = noiseSource(ctx);
-        const bp    = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 500; bp.Q.value = 0.4;
-        const windG = ctx.createGain(); windG.gain.value = 0.35;
-        wind.connect(bp); bp.connect(windG); windG.connect(out);
+        // Wind through foliage
+        const wind  = pinkSource(ctx, 4);
+        const wbp   = ctx.createBiquadFilter(); wbp.type = 'bandpass'; wbp.frequency.value = 550; wbp.Q.value = 0.3;
+        const windG = ctx.createGain(); windG.gain.value = 0.42;
+        wind.connect(wbp); wbp.connect(windG); windG.connect(out);
         wind.start();
+        // Gust LFO on wind gain
+        lfo(ctx, 0.08, 0.20, windG.gain);
+
+        // Insect bed: high-freq pink noise with fast AM (cricket effect)
+        const ins   = pinkSource(ctx, 3);
+        const ihp   = ctx.createBiquadFilter(); ihp.type = 'highpass'; ihp.frequency.value = 6500;
+        const insG  = ctx.createGain(); insG.gain.value = 0.22;
+        ins.connect(ihp); ihp.connect(insG); insG.connect(out);
+        ins.start();
+        lfo(ctx, 14, 0.18, insG.gain); // fast AM = cricket texture
 
         // Birds
         let dead = false;
@@ -254,101 +346,208 @@
           setTimeout(() => {
             if (dead) return;
             const now   = ctx.currentTime;
-            const base  = 900 + Math.random() * 1400;
-            const count = 1 + Math.floor(Math.random() * 5);
+            // Pick a random "species" (different base pitch & modulation)
+            const base  = 800 + Math.random() * 1800;
+            const count = 1 + Math.floor(Math.random() * 6);
+            const gap   = 0.08 + Math.random() * 0.06;
             for (let i = 0; i < count; i++) {
-              const t   = now + i * 0.11;
+              const t   = now + i * gap;
               const car = ctx.createOscillator();
               const mod = ctx.createOscillator();
-              const mGn = ctx.createGain();
-              const cGn = ctx.createGain();
-              car.type = 'sine'; mod.type = 'sine';
-              car.frequency.value = base + (Math.random() - 0.5) * 200;
-              mod.frequency.value = base * 1.4;
-              mGn.gain.value = base * 0.25;
-              cGn.gain.setValueAtTime(0, t);
-              cGn.gain.linearRampToValueAtTime(0.13, t + 0.02);
-              cGn.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-              mod.connect(mGn); mGn.connect(car.frequency);
-              car.connect(cGn); cGn.connect(out);
+              const mG  = ctx.createGain();
+              const cG  = ctx.createGain();
+              car.type  = 'sine'; mod.type = 'sine';
+              car.frequency.value = base + (Math.random() - 0.5) * 300;
+              mod.frequency.value = base * (1.3 + Math.random() * 0.3);
+              mG.gain.value = base * (0.18 + Math.random() * 0.15);
+              cG.gain.setValueAtTime(0, t);
+              cG.gain.linearRampToValueAtTime(0.14, t + 0.015);
+              cG.gain.exponentialRampToValueAtTime(0.0001, t + 0.20);
+              mod.connect(mG); mG.connect(car.frequency);
+              car.connect(cG); cG.connect(out);
               car.start(t); mod.start(t);
-              car.stop(t + 0.22); mod.stop(t + 0.22);
+              car.stop(t + 0.24); mod.stop(t + 0.24);
             }
             chirp();
-          }, 800 + Math.random() * 4500);
+          }, 700 + Math.random() * 5000);
         }
         chirp();
-        return () => { dead = true; try { wind.stop(); } catch(e) {} };
+
+        return () => {
+          dead = true;
+          try { wind.stop(); } catch(e) {}
+          try { ins.stop();  } catch(e) {}
+        };
       },
 
+      // ── Coffee Bar ──────────────────────────────────────────
       coffee(ctx, out) {
-        // Crowd murmur: overlapping band-passed noise layers
-        const freqs   = [180, 280, 420, 580, 780, 1050];
-        const sources = freqs.map(f => {
-          const s  = noiseSource(ctx);
-          const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 2.5;
-          const g  = ctx.createGain(); g.gain.value = 0.06 + Math.random() * 0.04;
-          s.connect(bp); bp.connect(g); g.connect(out);
+        // Crowd murmur: layered pink noise through narrow bandpass filters
+        // Wider, more varied bands than before for a richer murmur
+        const crowdG = ctx.createGain(); crowdG.gain.value = 0.95;
+        crowdG.connect(out);
+        const bands  = [160, 280, 420, 620, 900, 1350, 2100];
+        const srcs   = bands.map(f => {
+          const s  = pinkSource(ctx, 3);
+          const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 1.8;
+          const g  = ctx.createGain(); g.gain.value = (0.07 + Math.random() * 0.05) * (f < 500 ? 1.3 : 1.0);
+          s.connect(bp); bp.connect(g); g.connect(crowdG);
           s.start();
           return s;
         });
+        // Slow crowd-swell LFO
+        lfo(ctx, 0.035, 0.25, crowdG.gain);
 
-        // Occasional cup clinks
+        // Cup clinks & espresso steam sounds
         let dead = false;
         function clink() {
           if (dead) return;
           setTimeout(() => {
             if (dead) return;
-            const osc = ctx.createOscillator();
-            const g   = ctx.createGain();
-            const t   = ctx.currentTime;
-            osc.type = 'sine'; osc.frequency.value = 1800 + Math.random() * 1200;
-            g.gain.setValueAtTime(0.08, t);
-            g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-            osc.connect(g); g.connect(out);
-            osc.start(t); osc.stop(t + 0.4);
+            const t    = ctx.currentTime;
+            const type = Math.random();
+            if (type < 0.6) {
+              // Ceramic clink
+              const osc = ctx.createOscillator();
+              const g   = ctx.createGain();
+              osc.type = 'sine'; osc.frequency.value = 1600 + Math.random() * 1400;
+              g.gain.setValueAtTime(0.10, t);
+              g.gain.exponentialRampToValueAtTime(0.0001, t + 0.40);
+              osc.connect(g); g.connect(out);
+              osc.start(t); osc.stop(t + 0.45);
+            } else {
+              // Steam hiss: brief bandpass pink burst
+              const s  = pinkSource(ctx, 0.5);
+              const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3500; bp.Q.value = 0.5;
+              const g  = ctx.createGain();
+              g.gain.setValueAtTime(0.12, t);
+              g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+              s.connect(bp); bp.connect(g); g.connect(out);
+              s.start(t); s.stop(t + 0.6);
+            }
             clink();
-          }, (3 + Math.random() * 9) * 1000);
+          }, (2.5 + Math.random() * 8) * 1000);
         }
         clink();
-        return () => { dead = true; sources.forEach(s => { try { s.stop(); } catch(e) {} }); };
+
+        return () => { dead = true; srcs.forEach(s => { try { s.stop(); } catch(e) {} }); };
       },
 
+      // ── Snow ────────────────────────────────────────────────
       snow(ctx, out) {
-        // Very soft, airy low hum
-        const src = noiseSource(ctx);
-        const lp  = ctx.createBiquadFilter(); lp.type = 'lowpass';  lp.frequency.value = 260;
-        const hp  = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 80;
-        const g   = ctx.createGain(); g.gain.value = 0.7;
-        src.connect(lp); lp.connect(hp); hp.connect(g); g.connect(out);
+        // The quiet of snow: very soft filtered pink noise
+        const src  = pinkSource(ctx, 5);
+        const lp   = ctx.createBiquadFilter(); lp.type = 'lowpass';  lp.frequency.value = 500;
+        const hp   = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 90;
+        const ambG = ctx.createGain(); ambG.gain.value = 0.18;
+        src.connect(lp); lp.connect(hp); hp.connect(ambG); ambG.connect(out);
         src.start();
-        return () => { try { src.stop(); } catch(e) {} };
+        // Breathing quality — very slow LFO
+        lfo(ctx, 0.018, 0.07, ambG.gain);
+
+        // Occasional wind gust
+        let dead = false;
+        function gust() {
+          if (dead) return;
+          const delay = (18 + Math.random() * 45) * 1000;
+          setTimeout(() => {
+            if (dead) return;
+            const t    = ctx.currentTime;
+            const w    = pinkSource(ctx, 4);
+            const wbp  = ctx.createBiquadFilter(); wbp.type = 'bandpass'; wbp.frequency.value = 700; wbp.Q.value = 0.35;
+            const wg   = ctx.createGain();
+            wg.gain.setValueAtTime(0, t);
+            wg.gain.linearRampToValueAtTime(0.55, t + 1.8);
+            wg.gain.setTargetAtTime(0.0001, t + 2.5, 1.2);
+            w.connect(wbp); wbp.connect(wg); wg.connect(out);
+            w.start(t); w.stop(t + 8);
+            gust();
+          }, delay);
+        }
+        gust();
+
+        return () => { dead = true; try { src.stop(); } catch(e) {} };
       },
 
+      // ── Lofi ────────────────────────────────────────────────
       lofi(ctx, out) {
-        // Warm chord pad — Cmaj9 spread across two octaves
-        const freqs = [130.81, 164.81, 196.00, 246.94, 261.63, 329.63];
-        const oscs  = freqs.map(freq => {
+        // Tape "warmth" filter — the whole scene runs through this
+        const tape = ctx.createBiquadFilter();
+        tape.type  = 'lowpass'; tape.frequency.value = 4800; tape.Q.value = 0.6;
+        tape.connect(out);
+
+        // Am7 chord pad using sawtooth (warm, harmonically rich)
+        const padFreqs = [110, 130.81, 164.81, 196.00, 220, 261.63];
+        const padG     = ctx.createGain(); padG.gain.value = 0.10; padG.connect(tape);
+        const oscs     = padFreqs.map(freq => {
           const osc = ctx.createOscillator();
           const g   = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.value = freq + (Math.random() * 1.2 - 0.6); // micro-detune
-          g.gain.value = 0.10;
-          osc.connect(g); g.connect(out);
+          osc.type  = 'sawtooth';
+          osc.frequency.value = freq + (Math.random() * 2.5 - 1.25); // micro-detune
+          g.gain.value = 0.55 / padFreqs.length;
+          osc.connect(g); g.connect(padG);
           osc.start();
           return osc;
         });
 
-        // Vinyl crackle
-        const crack  = noiseSource(ctx, 0.5);
-        const crackF = ctx.createBiquadFilter(); crackF.type = 'highpass'; crackF.frequency.value = 3500;
-        const crackG = ctx.createGain(); crackG.gain.value = 0.025;
-        crack.connect(crackF); crackF.connect(crackG); crackG.connect(out);
+        // Tape wow/flutter: slow LFO on pitch
+        const flutterOsc = ctx.createOscillator();
+        const flutterG   = ctx.createGain(); flutterG.gain.value = 1.2;
+        flutterOsc.frequency.value = 0.22;
+        flutterOsc.connect(flutterG);
+        oscs.forEach(o => flutterG.connect(o.frequency));
+        flutterOsc.start();
+
+        // Vinyl crackle: high-freq pink noise
+        const crack  = pinkSource(ctx, 3);
+        const crackF = ctx.createBiquadFilter(); crackF.type = 'highpass'; crackF.frequency.value = 5500;
+        const crackG = ctx.createGain(); crackG.gain.value = 0.030;
+        crack.connect(crackF); crackF.connect(crackG); crackG.connect(out); // bypasses tape for bite
         crack.start();
 
+        // Lo-fi drum pattern (look-ahead scheduler)
+        const drumBuf  = pinkNoiseBuffer(ctx, 0.5);
+        const BPM      = 80;
+        const BEAT     = 60 / BPM;         // ~0.75 s
+        let beatNum    = 0;
+        let nextBeat   = ctx.currentTime + 0.05;
+        let dead       = false;
+        let schedTimer = null;
+
+        function hit(t, fType, fFreq, fQ, peakGain, dur) {
+          const s = ctx.createBufferSource();
+          s.buffer = drumBuf;
+          const f  = ctx.createBiquadFilter();
+          f.type = fType; f.frequency.value = fFreq;
+          if (fQ) f.Q.value = fQ;
+          const g = ctx.createGain();
+          g.gain.setValueAtTime(peakGain, t);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+          s.connect(f); f.connect(g); g.connect(tape);
+          s.start(t); s.stop(t + dur + 0.01);
+        }
+
+        function schedule() {
+          while (nextBeat < ctx.currentTime + 0.15) {
+            const b = beatNum % 4;
+            if (b === 0 || b === 2) hit(nextBeat, 'lowpass',  80,   null, 1.1, 0.22); // kick
+            if (b === 1 || b === 3) hit(nextBeat, 'bandpass', 900,  1.4,  0.55, 0.26); // snare
+            hit(nextBeat, 'highpass', 9500, null, 0.12, 0.03); // closed hat
+            if (beatNum % 2 === 0)  // swing 8th note
+              hit(nextBeat + BEAT * 0.62, 'highpass', 9500, null, 0.07, 0.05);
+            beatNum++;
+            nextBeat += BEAT;
+          }
+          if (!dead) schedTimer = setTimeout(schedule, 40);
+        }
+        schedTimer = setTimeout(schedule, 0);
+
         return () => {
+          dead = true;
+          clearTimeout(schedTimer);
           oscs.forEach(o => { try { o.stop(); } catch(e) {} });
-          try { crack.stop(); } catch(e) {}
+          try { flutterOsc.stop(); } catch(e) {}
+          try { crack.stop();     } catch(e) {}
         };
       },
     };
@@ -356,20 +555,18 @@
     // ── Toggle ─────────────────────────────────────────────────
     function toggle(sound, btn) {
       if (active.has(sound.id)) {
-        // Fade out then stop
         const { gainNode, cleanup } = active.get(sound.id);
         gainNode.gain.setTargetAtTime(0, getCtx().currentTime, 0.3);
         setTimeout(() => { try { cleanup(); gainNode.disconnect(); } catch(e) {} }, 1200);
         active.delete(sound.id);
         btn.classList.remove('is-on');
       } else {
-        // Start + fade in
         const ctx      = getCtx();
         const gainNode = ctx.createGain();
         gainNode.gain.setValueAtTime(0, ctx.currentTime);
         gainNode.connect(ctx.destination);
         const cleanup  = SCENES[sound.id](ctx, gainNode);
-        gainNode.gain.setTargetAtTime(sound.vol * masterVol, ctx.currentTime, 0.3);
+        gainNode.gain.setTargetAtTime(sound.vol * masterVol, ctx.currentTime, 0.4);
         active.set(sound.id, { gainNode, cleanup });
         btn.classList.add('is-on');
       }
@@ -379,9 +576,9 @@
     const grid = document.getElementById('sounds');
     SOUNDS.forEach(sound => {
       const btn = document.createElement('button');
-      btn.className   = 'sound-btn';
+      btn.className = 'sound-btn';
       btn.style.setProperty('--c-active', sound.color);
-      btn.innerHTML   = `<span class="icon">${sound.icon}</span><span class="label">${sound.label}</span>`;
+      btn.innerHTML = `<span class="icon">${sound.icon}</span><span class="label">${sound.label}</span>`;
       btn.addEventListener('click', () => toggle(sound, btn));
       grid.appendChild(btn);
     });
