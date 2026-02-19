@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ambient Sounds</title>
+  <link rel="stylesheet" href="../../shared/base.css" />
+
+  <style>
+    :root {
+      --bg:      #12131a;
+      --surface: #1c1e2a;
+      --border:  rgba(255,255,255,0.07);
+      --text:    #e4e6f0;
+      --muted:   #5c6080;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100%;
+      padding: 1.25rem 1rem 1rem;
+      gap: 1.1rem;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    .amb-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      align-self: flex-start;
+    }
+
+    /* ── Sound grid ─────────────────────────────────────────── */
+    .sounds {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.55rem;
+      width: 100%;
+      max-width: 360px;
+    }
+
+    .sound-btn {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 0.9rem 0.5rem 0.75rem;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .sound-btn:hover {
+      border-color: rgba(255,255,255,0.15);
+      background: #20222f;
+    }
+
+    .sound-btn.is-on {
+      border-color: var(--c-active);
+      box-shadow: 0 0 0 1px var(--c-active), 0 0 16px -4px var(--c-active);
+      background: color-mix(in srgb, var(--c-active) 12%, var(--surface));
+    }
+
+    .sound-btn .icon {
+      font-size: 1.5rem;
+      line-height: 1;
+    }
+
+    .sound-btn .label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      transition: color 0.2s;
+    }
+
+    .sound-btn.is-on .label {
+      color: var(--c-active);
+    }
+
+    /* pulse animation while active */
+    @keyframes pulse-ring {
+      0%   { box-shadow: 0 0 0 1px var(--c-active), 0 0 14px -4px var(--c-active); }
+      50%  { box-shadow: 0 0 0 1px var(--c-active), 0 0 22px -2px var(--c-active); }
+      100% { box-shadow: 0 0 0 1px var(--c-active), 0 0 14px -4px var(--c-active); }
+    }
+    .sound-btn.is-on {
+      animation: pulse-ring 3s ease-in-out infinite;
+    }
+
+    /* ── Volume ─────────────────────────────────────────────── */
+    .volume-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      width: 100%;
+      max-width: 360px;
+    }
+
+    .volume-row .vol-icon {
+      font-size: 0.9rem;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: 1;
+      height: 4px;
+      background: #2a2d3e;
+      border-radius: 99px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #5a6ae0;
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+
+    input[type="range"]:hover::-webkit-slider-thumb {
+      transform: scale(1.25);
+    }
+
+    .vol-pct {
+      font-size: 0.7rem;
+      color: var(--muted);
+      width: 2.5em;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="amb-title">Ambient Sounds</div>
+
+  <div class="sounds" id="sounds"></div>
+
+  <div class="volume-row">
+    <span class="vol-icon">🔈</span>
+    <input type="range" id="volume" min="0" max="1" step="0.01" value="0.65" />
+    <span class="vol-pct" id="volPct">65%</span>
+  </div>
+
+  <script>
+    // ── Sound definitions ──────────────────────────────────────
+    const SOUNDS = [
+      { id: 'rain',    icon: '🌧️', label: 'Rain',      color: '#74b9ff', vol: 0.55 },
+      { id: 'thunder', icon: '⛈️', label: 'Thunder',   color: '#a29bfe', vol: 0.60 },
+      { id: 'jungle',  icon: '🌿', label: 'Jungle',    color: '#55efc4', vol: 0.45 },
+      { id: 'coffee',  icon: '☕', label: 'Coffee Bar', color: '#fdcb6e', vol: 0.40 },
+      { id: 'snow',    icon: '❄️', label: 'Snow',      color: '#b2d8f7', vol: 0.30 },
+      { id: 'lofi',    icon: '🎵', label: 'Lofi',      color: '#fd79a8', vol: 0.38 },
+    ];
+
+    let actx = null;
+    let masterVol = 0.65;
+    const active = new Map(); // id → { gainNode, cleanup }
+
+    function getCtx() {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      return actx;
+    }
+
+    // ── Noise helpers ──────────────────────────────────────────
+    function noiseBuffer(ctx, secs = 2) {
+      const buf = ctx.createBuffer(1, ctx.sampleRate * secs, ctx.sampleRate);
+      const ch  = buf.getChannelData(0);
+      for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+      return buf;
+    }
+
+    function noiseSource(ctx, secs) {
+      const src = ctx.createBufferSource();
+      src.buffer = noiseBuffer(ctx, secs);
+      src.loop   = true;
+      return src;
+    }
+
+    // ── Sound scene builders ───────────────────────────────────
+    const SCENES = {
+
+      rain(ctx, out) {
+        const src = noiseSource(ctx);
+        const lp  = ctx.createBiquadFilter(); lp.type = 'lowpass';  lp.frequency.value = 1300;
+        const hp  = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 380;
+        src.connect(lp); lp.connect(hp); hp.connect(out);
+        src.start();
+        return () => { try { src.stop(); } catch(e) {} };
+      },
+
+      thunder(ctx, out) {
+        // Background rain
+        const rain = noiseSource(ctx);
+        const lp   = ctx.createBiquadFilter(); lp.type = 'lowpass';  lp.frequency.value = 900;
+        const hp   = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 200;
+        const rg   = ctx.createGain(); rg.gain.value = 0.6;
+        rain.connect(lp); lp.connect(hp); hp.connect(rg); rg.connect(out);
+        rain.start();
+
+        // Thunder rumbles
+        let dead = false;
+        function boom() {
+          if (dead) return;
+          const delay = (5 + Math.random() * 14) * 1000;
+          setTimeout(() => {
+            if (dead) return;
+            const rumble = noiseSource(ctx, 4);
+            const rlp    = ctx.createBiquadFilter(); rlp.type = 'lowpass'; rlp.frequency.value = 100;
+            const rg2    = ctx.createGain();
+            const t      = ctx.currentTime;
+            rg2.gain.setValueAtTime(0, t);
+            rg2.gain.linearRampToValueAtTime(1.8, t + 0.06);
+            rg2.gain.exponentialRampToValueAtTime(0.001, t + 3.5);
+            rumble.connect(rlp); rlp.connect(rg2); rg2.connect(out);
+            rumble.start(); rumble.stop(t + 4);
+            boom();
+          }, delay);
+        }
+        boom();
+        return () => { dead = true; try { rain.stop(); } catch(e) {} };
+      },
+
+      jungle(ctx, out) {
+        // Wind
+        const wind  = noiseSource(ctx);
+        const bp    = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 500; bp.Q.value = 0.4;
+        const windG = ctx.createGain(); windG.gain.value = 0.35;
+        wind.connect(bp); bp.connect(windG); windG.connect(out);
+        wind.start();
+
+        // Birds
+        let dead = false;
+        function chirp() {
+          if (dead) return;
+          setTimeout(() => {
+            if (dead) return;
+            const now   = ctx.currentTime;
+            const base  = 900 + Math.random() * 1400;
+            const count = 1 + Math.floor(Math.random() * 5);
+            for (let i = 0; i < count; i++) {
+              const t   = now + i * 0.11;
+              const car = ctx.createOscillator();
+              const mod = ctx.createOscillator();
+              const mGn = ctx.createGain();
+              const cGn = ctx.createGain();
+              car.type = 'sine'; mod.type = 'sine';
+              car.frequency.value = base + (Math.random() - 0.5) * 200;
+              mod.frequency.value = base * 1.4;
+              mGn.gain.value = base * 0.25;
+              cGn.gain.setValueAtTime(0, t);
+              cGn.gain.linearRampToValueAtTime(0.13, t + 0.02);
+              cGn.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+              mod.connect(mGn); mGn.connect(car.frequency);
+              car.connect(cGn); cGn.connect(out);
+              car.start(t); mod.start(t);
+              car.stop(t + 0.22); mod.stop(t + 0.22);
+            }
+            chirp();
+          }, 800 + Math.random() * 4500);
+        }
+        chirp();
+        return () => { dead = true; try { wind.stop(); } catch(e) {} };
+      },
+
+      coffee(ctx, out) {
+        // Crowd murmur: overlapping band-passed noise layers
+        const freqs   = [180, 280, 420, 580, 780, 1050];
+        const sources = freqs.map(f => {
+          const s  = noiseSource(ctx);
+          const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 2.5;
+          const g  = ctx.createGain(); g.gain.value = 0.06 + Math.random() * 0.04;
+          s.connect(bp); bp.connect(g); g.connect(out);
+          s.start();
+          return s;
+        });
+
+        // Occasional cup clinks
+        let dead = false;
+        function clink() {
+          if (dead) return;
+          setTimeout(() => {
+            if (dead) return;
+            const osc = ctx.createOscillator();
+            const g   = ctx.createGain();
+            const t   = ctx.currentTime;
+            osc.type = 'sine'; osc.frequency.value = 1800 + Math.random() * 1200;
+            g.gain.setValueAtTime(0.08, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+            osc.connect(g); g.connect(out);
+            osc.start(t); osc.stop(t + 0.4);
+            clink();
+          }, (3 + Math.random() * 9) * 1000);
+        }
+        clink();
+        return () => { dead = true; sources.forEach(s => { try { s.stop(); } catch(e) {} }); };
+      },
+
+      snow(ctx, out) {
+        // Very soft, airy low hum
+        const src = noiseSource(ctx);
+        const lp  = ctx.createBiquadFilter(); lp.type = 'lowpass';  lp.frequency.value = 260;
+        const hp  = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 80;
+        const g   = ctx.createGain(); g.gain.value = 0.7;
+        src.connect(lp); lp.connect(hp); hp.connect(g); g.connect(out);
+        src.start();
+        return () => { try { src.stop(); } catch(e) {} };
+      },
+
+      lofi(ctx, out) {
+        // Warm chord pad — Cmaj9 spread across two octaves
+        const freqs = [130.81, 164.81, 196.00, 246.94, 261.63, 329.63];
+        const oscs  = freqs.map(freq => {
+          const osc = ctx.createOscillator();
+          const g   = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq + (Math.random() * 1.2 - 0.6); // micro-detune
+          g.gain.value = 0.10;
+          osc.connect(g); g.connect(out);
+          osc.start();
+          return osc;
+        });
+
+        // Vinyl crackle
+        const crack  = noiseSource(ctx, 0.5);
+        const crackF = ctx.createBiquadFilter(); crackF.type = 'highpass'; crackF.frequency.value = 3500;
+        const crackG = ctx.createGain(); crackG.gain.value = 0.025;
+        crack.connect(crackF); crackF.connect(crackG); crackG.connect(out);
+        crack.start();
+
+        return () => {
+          oscs.forEach(o => { try { o.stop(); } catch(e) {} });
+          try { crack.stop(); } catch(e) {}
+        };
+      },
+    };
+
+    // ── Toggle ─────────────────────────────────────────────────
+    function toggle(sound, btn) {
+      if (active.has(sound.id)) {
+        // Fade out then stop
+        const { gainNode, cleanup } = active.get(sound.id);
+        gainNode.gain.setTargetAtTime(0, getCtx().currentTime, 0.3);
+        setTimeout(() => { try { cleanup(); gainNode.disconnect(); } catch(e) {} }, 1200);
+        active.delete(sound.id);
+        btn.classList.remove('is-on');
+      } else {
+        // Start + fade in
+        const ctx      = getCtx();
+        const gainNode = ctx.createGain();
+        gainNode.gain.setValueAtTime(0, ctx.currentTime);
+        gainNode.connect(ctx.destination);
+        const cleanup  = SCENES[sound.id](ctx, gainNode);
+        gainNode.gain.setTargetAtTime(sound.vol * masterVol, ctx.currentTime, 0.3);
+        active.set(sound.id, { gainNode, cleanup });
+        btn.classList.add('is-on');
+      }
+    }
+
+    // ── Build UI ───────────────────────────────────────────────
+    const grid = document.getElementById('sounds');
+    SOUNDS.forEach(sound => {
+      const btn = document.createElement('button');
+      btn.className   = 'sound-btn';
+      btn.style.setProperty('--c-active', sound.color);
+      btn.innerHTML   = `<span class="icon">${sound.icon}</span><span class="label">${sound.label}</span>`;
+      btn.addEventListener('click', () => toggle(sound, btn));
+      grid.appendChild(btn);
+    });
+
+    // ── Volume slider ──────────────────────────────────────────
+    const volSlider = document.getElementById('volume');
+    const volPct    = document.getElementById('volPct');
+
+    volSlider.addEventListener('input', () => {
+      masterVol = parseFloat(volSlider.value);
+      volPct.textContent = `${Math.round(masterVol * 100)}%`;
+      if (!actx) return;
+      active.forEach(({ gainNode }, id) => {
+        const sound = SOUNDS.find(s => s.id === id);
+        if (sound) gainNode.gain.setTargetAtTime(sound.vol * masterVol, actx.currentTime, 0.1);
+      });
+    });
+  </script>
+</body>
+</html>

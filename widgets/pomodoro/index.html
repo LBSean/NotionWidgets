@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pomodoro Timer</title>
+  <link rel="stylesheet" href="../../shared/base.css" />
+
+  <style>
+    /* ── Mode colour tokens ───────────────────────────────────── */
+    :root {
+      --c-accent:  #e55c5c;
+      --c-bg:      #fff8f7;
+      --c-text:    #2c1810;
+      --c-surface: #fff2f0;
+      --c-border:  #f0d8d5;
+    }
+    [data-mode="break"] {
+      --c-accent:  #4a9eda;
+      --c-bg:      #f0f7ff;
+      --c-text:    #0d2137;
+      --c-surface: #e8f3fd;
+      --c-border:  #c5dff5;
+    }
+    [data-mode="longBreak"] {
+      --c-accent:  #3ab07a;
+      --c-bg:      #f0fff7;
+      --c-text:    #0d2b1a;
+      --c-surface: #e0f9ed;
+      --c-border:  #b5e8d0;
+    }
+
+    /* ── Layout ───────────────────────────────────────────────── */
+    body {
+      background: var(--c-bg);
+      color: var(--c-text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100%;
+      transition: background 0.6s ease, color 0.6s ease;
+    }
+
+    .pomo {
+      width: 100%;
+      max-width: 340px;
+      padding: 1.75rem 1.25rem 1.25rem;
+      text-align: center;
+    }
+
+    /* ── Mode label ───────────────────────────────────────────── */
+    .pomo__mode {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--c-accent);
+      margin-bottom: 0.6rem;
+      transition: color 0.6s;
+    }
+
+    /* ── Time display ─────────────────────────────────────────── */
+    .pomo__time {
+      font-size: clamp(3.5rem, 16vw, 5rem);
+      font-weight: 200;
+      font-family: "SF Mono", "Fira Code", "Courier New", monospace;
+      color: var(--c-text);
+      letter-spacing: -0.02em;
+      line-height: 1;
+      transition: color 0.6s;
+    }
+
+    /* ── Session dots ─────────────────────────────────────────── */
+    .pomo__dots {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin: 1.1rem 0 1.5rem;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--c-border);
+      transition: background 0.3s, transform 0.2s;
+    }
+    .dot.is-done {
+      background: var(--c-accent);
+      transform: scale(1.15);
+    }
+
+    /* ── Controls ─────────────────────────────────────────────── */
+    .pomo__controls {
+      display: flex;
+      gap: 0.6rem;
+      justify-content: center;
+    }
+
+    .btn {
+      padding: 0.55em 1.4em;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: filter 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .btn--primary {
+      background: var(--c-accent);
+      color: #fff;
+      min-width: 88px;
+      transition: background 0.6s, filter 0.15s;
+    }
+    .btn--primary:hover { filter: brightness(0.92); }
+
+    .btn--ghost {
+      background: transparent;
+      color: var(--c-text);
+      border: 1.5px solid var(--c-border);
+    }
+    .btn--ghost:hover {
+      border-color: var(--c-accent);
+      color: var(--c-accent);
+    }
+
+    /* ── Footer ───────────────────────────────────────────────── */
+    .pomo__footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 1.25rem;
+      padding: 0 0.1rem;
+    }
+
+    .pomo__log {
+      font-size: 0.7rem;
+      color: #aaa;
+      height: 1em;
+    }
+
+    .btn-icon {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #c0b8b5;
+      font-size: 1rem;
+      padding: 0.2rem 0.3rem;
+      border-radius: 4px;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+    .btn-icon:hover { color: var(--c-accent); }
+
+    /* ── Settings panel ───────────────────────────────────────── */
+    .settings {
+      position: fixed;
+      inset: 0;
+      background: #fff;
+      overflow-y: auto;
+      padding: 1.2rem 1.4rem 2rem;
+      transform: translateY(100%);
+      transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 10;
+    }
+    .settings.is-open { transform: translateY(0); }
+
+    .settings__head {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1.4rem;
+    }
+    .settings__head h2 { font-size: 0.95rem; font-weight: 700; }
+
+    .section-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #bbb;
+      margin: 1.4rem 0 0.8rem;
+    }
+
+    .field {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.65rem;
+    }
+    .field label {
+      flex: 1;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: #444;
+    }
+    .field input[type="number"] {
+      width: 62px;
+      padding: 0.4em 0.5em;
+      text-align: center;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 0.88rem;
+    }
+    .field .unit { font-size: 0.75rem; color: #aaa; }
+
+    .field--col {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.35rem;
+      margin-bottom: 0.8rem;
+    }
+    .field--col label {
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: #444;
+    }
+    .field--col input[type="url"],
+    .field--col input[type="text"] {
+      width: 100%;
+      padding: 0.45em 0.6em;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field--col input:focus { border-color: #4a9eda; }
+
+    .hint {
+      font-size: 0.74rem;
+      color: #aaa;
+      line-height: 1.5;
+      margin-bottom: 0.75rem;
+    }
+
+    .btn-save {
+      width: 100%;
+      padding: 0.65em;
+      background: #4a9eda;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+    .btn-save:hover { background: #2980b9; }
+
+    /* ── Toast ────────────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(calc(100% + 1.5rem));
+      background: #333;
+      color: #fff;
+      padding: 0.45em 1em;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      white-space: nowrap;
+      pointer-events: none;
+      transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 99;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body data-mode="work">
+
+  <!-- ── Main timer ──────────────────────────────────────────── -->
+  <div class="pomo">
+    <div class="pomo__mode"  id="modeLabel">Work Session</div>
+    <div class="pomo__time"  id="display">25:00</div>
+    <div class="pomo__dots"  id="dots"></div>
+
+    <div class="pomo__controls">
+      <button class="btn btn--primary" id="startBtn">Start</button>
+      <button class="btn btn--ghost"   id="resetBtn">Reset</button>
+    </div>
+
+    <div class="pomo__footer">
+      <span class="pomo__log" id="logStatus"></span>
+      <button class="btn-icon" id="settingsBtn" title="Settings">⚙</button>
+    </div>
+  </div>
+
+  <!-- ── Settings panel ─────────────────────────────────────── -->
+  <div class="settings" id="settingsPanel">
+    <div class="settings__head">
+      <button class="btn-icon" id="closeSettings">←</button>
+      <h2>Settings</h2>
+    </div>
+
+    <p class="section-title">Timer Durations</p>
+    <div class="field">
+      <label for="sWork">Work</label>
+      <input type="number" id="sWork" min="1" max="120" value="25" />
+      <span class="unit">min</span>
+    </div>
+    <div class="field">
+      <label for="sShort">Short break</label>
+      <input type="number" id="sShort" min="1" max="60" value="5" />
+      <span class="unit">min</span>
+    </div>
+    <div class="field">
+      <label for="sLong">Long break</label>
+      <input type="number" id="sLong" min="1" max="60" value="15" />
+      <span class="unit">min</span>
+    </div>
+    <div class="field">
+      <label for="sSessions">Sessions before long break</label>
+      <input type="number" id="sSessions" min="2" max="8" value="4" />
+    </div>
+
+    <p class="section-title">Notion Logging</p>
+    <p class="hint">
+      After each completed work session, a POST request is sent to your webhook URL with session data (date, duration, label). Works with Make.com, Zapier, n8n, or any HTTP endpoint that creates a Notion record.
+    </p>
+    <div class="field--col">
+      <label for="sWebhook">Webhook URL</label>
+      <input type="url" id="sWebhook" placeholder="https://hook.eu1.make.com/…" />
+    </div>
+    <div class="field--col">
+      <label for="sLabel">Session label</label>
+      <input type="text" id="sLabel" placeholder="e.g. Deep Work, Study, Coding…" />
+    </div>
+
+    <button class="btn-save" id="saveBtn">Save Settings</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ── Defaults & config ─────────────────────────────────────
+    const DEFAULTS = { work: 25, short: 5, long: 15, sessions: 4, webhook: '', label: '' };
+    let cfg = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('pomo-cfg') || '{}') };
+
+    const MODES = {
+      work:  { label: 'Work Session', dataMode: 'work',      dur: () => cfg.work  },
+      short: { label: 'Short Break',  dataMode: 'break',     dur: () => cfg.short },
+      long:  { label: 'Long Break',   dataMode: 'longBreak', dur: () => cfg.long  },
+    };
+
+    // ── State ─────────────────────────────────────────────────
+    let mode         = 'work';
+    let remaining    = cfg.work * 60;
+    let completedSessions = 0;
+    let running      = false;
+    let tickId       = null;
+    let audioCtx     = null;
+
+    // ── DOM refs ──────────────────────────────────────────────
+    const displayEl   = document.getElementById('display');
+    const modeLabelEl = document.getElementById('modeLabel');
+    const dotsEl      = document.getElementById('dots');
+    const startBtn    = document.getElementById('startBtn');
+    const logStatusEl = document.getElementById('logStatus');
+
+    // ── Render ────────────────────────────────────────────────
+    function render() {
+      const m = String(Math.floor(remaining / 60)).padStart(2, '0');
+      const s = String(remaining % 60).padStart(2, '0');
+      displayEl.textContent  = `${m}:${s}`;
+      document.title         = `${m}:${s} – ${MODES[mode].label}`;
+      modeLabelEl.textContent = MODES[mode].label;
+      document.body.dataset.mode = MODES[mode].dataMode;
+      startBtn.textContent   = running ? 'Pause' : 'Start';
+
+      dotsEl.innerHTML = '';
+      for (let i = 0; i < cfg.sessions; i++) {
+        const d = document.createElement('span');
+        d.className = 'dot' + (i < completedSessions ? ' is-done' : '');
+        dotsEl.appendChild(d);
+      }
+    }
+
+    // ── Timer control ─────────────────────────────────────────
+    function start() {
+      requestNotifPerm();
+      running = true;
+      tickId  = setInterval(tick, 1000);
+      render();
+    }
+
+    function pause() {
+      running = false;
+      clearInterval(tickId);
+      render();
+    }
+
+    function reset() {
+      pause();
+      remaining = MODES[mode].dur() * 60;
+      render();
+    }
+
+    function tick() {
+      if (remaining <= 0) {
+        clearInterval(tickId);
+        running = false;
+        onComplete();
+        return;
+      }
+      remaining--;
+      render();
+    }
+
+    function onComplete() {
+      chime();
+      notify();
+
+      if (mode === 'work') {
+        logSession();
+        completedSessions++;
+        if (completedSessions >= cfg.sessions) {
+          completedSessions = 0;
+          switchMode('long');
+        } else {
+          switchMode('short');
+        }
+      } else {
+        switchMode('work');
+      }
+
+      // Slight delay then auto-start
+      setTimeout(start, 600);
+    }
+
+    function switchMode(m) {
+      mode      = m;
+      remaining = MODES[m].dur() * 60;
+      render();
+    }
+
+    // ── Audio ─────────────────────────────────────────────────
+    function getAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    function chime() {
+      try {
+        const ctx = getAudio();
+        // Ascending C-E-G-C chord arpeggio
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+          const osc  = ctx.createOscillator();
+          const gain = ctx.createGain();
+          const t    = ctx.currentTime + i * 0.16;
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0, t);
+          gain.gain.linearRampToValueAtTime(0.22, t + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 1.3);
+        });
+      } catch (e) { /* audio blocked */ }
+    }
+
+    // ── Notifications ─────────────────────────────────────────
+    function requestNotifPerm() {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+
+    function notify() {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const body = mode === 'work'
+          ? 'Work session done — take a break!'
+          : 'Break over — time to focus!';
+        new Notification('Pomodoro', { body });
+      }
+    }
+
+    // ── Notion logging via webhook ────────────────────────────
+    async function logSession() {
+      if (!cfg.webhook) return;
+      logStatusEl.textContent = 'Logging…';
+      const payload = {
+        date:        new Date().toISOString().slice(0, 10),
+        completedAt: new Date().toLocaleString(),
+        duration:    cfg.work,
+        type:        'Work',
+        label:       cfg.label || 'Pomodoro',
+        session:     completedSessions + 1,
+      };
+      try {
+        const res = await fetch(cfg.webhook, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(payload),
+        });
+        logStatusEl.textContent = res.ok ? '✓ Logged' : '⚠ Log failed';
+      } catch {
+        logStatusEl.textContent = '⚠ Log failed';
+      }
+      setTimeout(() => { logStatusEl.textContent = ''; }, 3500);
+    }
+
+    // ── Settings ──────────────────────────────────────────────
+    function loadForm() {
+      document.getElementById('sWork').value     = cfg.work;
+      document.getElementById('sShort').value    = cfg.short;
+      document.getElementById('sLong').value     = cfg.long;
+      document.getElementById('sSessions').value = cfg.sessions;
+      document.getElementById('sWebhook').value  = cfg.webhook;
+      document.getElementById('sLabel').value    = cfg.label;
+    }
+
+    function saveSettings() {
+      cfg.work     = Math.max(1, +document.getElementById('sWork').value     || 25);
+      cfg.short    = Math.max(1, +document.getElementById('sShort').value    || 5);
+      cfg.long     = Math.max(1, +document.getElementById('sLong').value     || 15);
+      cfg.sessions = Math.max(2, +document.getElementById('sSessions').value || 4);
+      cfg.webhook  = document.getElementById('sWebhook').value.trim();
+      cfg.label    = document.getElementById('sLabel').value.trim();
+      localStorage.setItem('pomo-cfg', JSON.stringify(cfg));
+      closeSettings();
+      reset();
+      toast('Settings saved');
+    }
+
+    const panel = document.getElementById('settingsPanel');
+    document.getElementById('settingsBtn').addEventListener('click', () => { loadForm(); panel.classList.add('is-open'); });
+    document.getElementById('closeSettings').addEventListener('click', closeSettings);
+    document.getElementById('saveBtn').addEventListener('click', saveSettings);
+    function closeSettings() { panel.classList.remove('is-open'); }
+
+    // ── Toast ─────────────────────────────────────────────────
+    const toastEl = document.getElementById('toast');
+    let toastTimer;
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2500);
+    }
+
+    // ── Button wiring ─────────────────────────────────────────
+    startBtn.addEventListener('click', () => { running ? pause() : start(); });
+    document.getElementById('resetBtn').addEventListener('click', reset);
+
+    // ── Init ──────────────────────────────────────────────────
+    render();
+  </script>
+</body>
+</html>

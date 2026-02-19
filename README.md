@@ -91,4 +91,7 @@ Browse and copy embed URLs from the **[live gallery →](https://lbsean.github.i
 | Widget | Status | Notion embed URL |
 |--------|--------|------------------|
 | [Clock](https://lbsean.github.io/NotionWidgets/widgets/clock/) | ✅ | `https://lbsean.github.io/NotionWidgets/widgets/clock/` |
+| [Pomodoro](https://lbsean.github.io/NotionWidgets/widgets/pomodoro/) | ✅ | `https://lbsean.github.io/NotionWidgets/widgets/pomodoro/` |
+| [Ambient Sounds](https://lbsean.github.io/NotionWidgets/widgets/ambient/) | ✅ | `https://lbsean.github.io/NotionWidgets/widgets/ambient/` |
+| [Heatmap](https://lbsean.github.io/NotionWidgets/widgets/heatmap/) | ✅ | `https://lbsean.github.io/NotionWidgets/widgets/heatmap/` |
 

@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Heatmap</title>
+  <link rel="stylesheet" href="../../shared/base.css" />
+
+  <style>
+    body {
+      background: transparent;
+      color: var(--color-text);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      min-height: 100%;
+      padding: 0.9rem 1rem 0.75rem;
+      gap: 0.5rem;
+    }
+
+    /* ── Header row ───────────────────────────────────────────── */
+    .hm-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .hm-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+    }
+
+    .hm-stats {
+      font-size: 0.7rem;
+      color: var(--color-text-muted);
+    }
+
+    .hm-stats strong {
+      color: var(--color-text);
+    }
+
+    /* ── Year nav ─────────────────────────────────────────────── */
+    .hm-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--color-text-muted);
+    }
+
+    .hm-nav button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0 0.2rem;
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+      line-height: 1;
+      border-radius: 3px;
+      transition: color 0.15s;
+    }
+    .hm-nav button:hover { color: var(--color-text); }
+
+    /* ── Chart wrapper ────────────────────────────────────────── */
+    .hm-outer {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    .hm-chart {
+      display: flex;
+      flex-direction: row;
+      gap: 0;
+      user-select: none;
+    }
+
+    /* Day labels column */
+    .hm-day-labels {
+      display: flex;
+      flex-direction: column;
+      padding-top: 18px; /* align with month labels */
+      margin-right: 4px;
+      flex-shrink: 0;
+    }
+
+    .hm-day-label {
+      font-size: 0.6rem;
+      color: var(--color-text-muted);
+      line-height: 1;
+      height: var(--cell);
+      display: flex;
+      align-items: center;
+    }
+
+    /* Weeks area */
+    .hm-grid {
+      position: relative;
+      flex: 1;
+    }
+
+    .hm-months {
+      display: flex;
+      position: relative;
+      height: 18px;
+      margin-bottom: 2px;
+    }
+
+    .hm-month-label {
+      position: absolute;
+      font-size: 0.6rem;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      top: 0;
+      line-height: 18px;
+      white-space: nowrap;
+    }
+
+    .hm-weeks {
+      display: flex;
+      flex-direction: row;
+      gap: 2px;
+    }
+
+    .hm-week {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+
+    .cell {
+      width:  var(--cell);
+      height: var(--cell);
+      border-radius: 2px;
+      background: #ebedf0;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      flex-shrink: 0;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .cell { background: #21262d; }
+    }
+
+    .cell:hover { transform: scale(1.3); z-index: 1; position: relative; }
+
+    .cell.is-on {
+      background: #39d353;
+    }
+
+    .cell.is-today {
+      outline: 1.5px solid #888;
+      outline-offset: 1px;
+    }
+
+    .cell.is-empty {
+      background: transparent;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    /* ── Legend ──────────────────────────────────────────────── */
+    .hm-legend {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.62rem;
+      color: var(--color-text-muted);
+      margin-top: 0.2rem;
+    }
+
+    .legend-cell {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+
+    .legend-cell.off { background: #ebedf0; }
+    .legend-cell.on  { background: #39d353; }
+
+    @media (prefers-color-scheme: dark) {
+      .legend-cell.off { background: #21262d; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Rendered entirely by JS -->
+  <div id="root"></div>
+
+  <script>
+    const MONTHS   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const DAY_LABELS = ['','M','','W','','F','']; // sparse: Sun Mon Tue...
+
+    let year = new Date().getFullYear();
+
+    // ── Persistence ────────────────────────────────────────────
+    function storageKey(y) { return `heatmap-${y}`; }
+
+    function loadActive(y) {
+      return new Set(JSON.parse(localStorage.getItem(storageKey(y)) || '[]'));
+    }
+
+    function saveActive(y, set) {
+      localStorage.setItem(storageKey(y), JSON.stringify([...set]));
+    }
+
+    // ── Date helpers ────────────────────────────────────────────
+    function iso(d) {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    function isToday(d) {
+      const n = new Date();
+      return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+    }
+
+    // ── Build grid data ─────────────────────────────────────────
+    // Returns array of weeks; each week = array of 7 items: { date|null }
+    function buildWeeks(y) {
+      const jan1 = new Date(y, 0, 1);
+      const startDow = jan1.getDay(); // 0=Sun
+      const weeks = [];
+      let week = [];
+
+      // Leading empty cells
+      for (let i = 0; i < startDow; i++) week.push(null);
+
+      const d = new Date(y, 0, 1);
+      while (d.getFullYear() === y) {
+        week.push(new Date(d));
+        if (week.length === 7) { weeks.push(week); week = []; }
+        d.setDate(d.getDate() + 1);
+      }
+
+      // Trailing empty cells
+      if (week.length > 0) {
+        while (week.length < 7) week.push(null);
+        weeks.push(week);
+      }
+
+      return weeks;
+    }
+
+    // Month label positions: { name, colIndex }
+    function monthLabels(weeks) {
+      const labels = [];
+      let lastMonth = -1;
+      weeks.forEach((week, col) => {
+        const first = week.find(d => d !== null);
+        if (first && first.getMonth() !== lastMonth) {
+          lastMonth = first.getMonth();
+          labels.push({ name: MONTHS[lastMonth], col });
+        }
+      });
+      return labels;
+    }
+
+    // ── Render ──────────────────────────────────────────────────
+    function render() {
+      const active  = loadActive(year);
+      const weeks   = buildWeeks(year);
+      const today   = iso(new Date());
+      const CELL    = 13; // px
+
+      const root = document.getElementById('root');
+      root.innerHTML = '';
+
+      // Compute active count for current year
+      const activeDays = [...active].filter(d => d.startsWith(year)).length;
+
+      // ── Header ──
+      const head = document.createElement('div');
+      head.className = 'hm-head';
+
+      const titleEl = document.createElement('span');
+      titleEl.className   = 'hm-title';
+      titleEl.textContent = `${year} Activity`;
+
+      const statsEl = document.createElement('span');
+      statsEl.className = 'hm-stats';
+      statsEl.innerHTML  = `<strong>${activeDays}</strong> ${activeDays === 1 ? 'day' : 'days'} active`;
+
+      const navEl = document.createElement('div');
+      navEl.className = 'hm-nav';
+      const prevBtn = document.createElement('button');
+      prevBtn.textContent = '‹';
+      prevBtn.addEventListener('click', () => { year--; render(); });
+      const nextBtn = document.createElement('button');
+      nextBtn.textContent = '›';
+      nextBtn.addEventListener('click', () => { year++; render(); });
+      navEl.appendChild(prevBtn);
+      navEl.appendChild(document.createTextNode(String(year)));
+      navEl.appendChild(nextBtn);
+
+      head.appendChild(titleEl);
+      head.appendChild(navEl);
+      root.appendChild(head);
+
+      // Stats row
+      root.appendChild(statsEl);
+
+      // ── Chart ──
+      const outer = document.createElement('div');
+      outer.className = 'hm-outer';
+
+      const chart = document.createElement('div');
+      chart.className = 'hm-chart';
+
+      // Day labels
+      const dayLabelCol = document.createElement('div');
+      dayLabelCol.className = 'hm-day-labels';
+      dayLabelCol.style.setProperty('--cell', CELL + 'px');
+      DAY_LABELS.forEach(l => {
+        const el = document.createElement('div');
+        el.className   = 'hm-day-label';
+        el.textContent = l;
+        dayLabelCol.appendChild(el);
+      });
+      chart.appendChild(dayLabelCol);
+
+      // Grid
+      const gridEl = document.createElement('div');
+      gridEl.className = 'hm-grid';
+
+      // Month labels
+      const monthsEl = document.createElement('div');
+      monthsEl.className = 'hm-months';
+      monthLabels(weeks).forEach(({ name, col }) => {
+        const el = document.createElement('span');
+        el.className   = 'hm-month-label';
+        el.textContent = name;
+        el.style.left  = `${col * (CELL + 2)}px`;
+        monthsEl.appendChild(el);
+      });
+      gridEl.appendChild(monthsEl);
+
+      // Weeks
+      const weeksEl = document.createElement('div');
+      weeksEl.className = 'hm-weeks';
+
+      weeks.forEach(week => {
+        const weekEl = document.createElement('div');
+        weekEl.className = 'hm-week';
+        weekEl.style.setProperty('--cell', CELL + 'px');
+
+        week.forEach(date => {
+          const cell = document.createElement('div');
+          cell.style.setProperty('--cell', CELL + 'px');
+
+          if (!date) {
+            cell.className = 'cell is-empty';
+          } else {
+            const key = iso(date);
+            const on  = active.has(key);
+            cell.className = 'cell' + (on ? ' is-on' : '') + (key === today ? ' is-today' : '');
+            cell.title     = key;
+            cell.addEventListener('click', () => {
+              if (active.has(key)) active.delete(key);
+              else                  active.add(key);
+              saveActive(year, active);
+              // Just update this cell without full re-render
+              cell.classList.toggle('is-on');
+              // Update stats
+              const cnt = [...active].filter(d => d.startsWith(year)).length;
+              statsEl.innerHTML = `<strong>${cnt}</strong> ${cnt === 1 ? 'day' : 'days'} active`;
+            });
+          }
+
+          weekEl.appendChild(cell);
+        });
+
+        weeksEl.appendChild(weekEl);
+      });
+
+      gridEl.appendChild(weeksEl);
+      chart.appendChild(gridEl);
+      outer.appendChild(chart);
+      root.appendChild(outer);
+
+      // ── Legend ──
+      const legend = document.createElement('div');
+      legend.className = 'hm-legend';
+      legend.innerHTML = `
+        <span>Less</span>
+        <div class="legend-cell off"></div>
+        <div class="legend-cell on"></div>
+        <span>More</span>
+      `;
+      root.appendChild(legend);
+    }
+
+    render();
+  </script>
+</body>
+</html>
