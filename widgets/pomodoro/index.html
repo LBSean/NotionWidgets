@@ -236,6 +236,37 @@
       margin-bottom: 0.75rem;
     }
 
+    .webhook-row {
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+    }
+    .webhook-row input { flex: 1; }
+
+    .btn-test {
+      flex-shrink: 0;
+      padding: 0.42em 0.75em;
+      background: #f0f0f0;
+      color: #444;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.1s;
+    }
+    .btn-test:hover { background: #e5e5e5; }
+    .btn-test:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .test-result {
+      font-size: 0.72rem;
+      margin-top: 0.25rem;
+      min-height: 1em;
+    }
+    .test-result.ok  { color: #22c55e; }
+    .test-result.err { color: #ef4444; }
+
     .btn-save {
       width: 100%;
       padding: 0.65em;
@@ -318,11 +349,15 @@
 
     <p class="section-title">Notion Logging</p>
     <p class="hint">
-      After each completed work session, a POST request is sent to your webhook URL with session data (date, duration, label). Works with Make.com, Zapier, n8n, or any HTTP endpoint that creates a Notion record.
+      Deploy the Cloudflare Worker in <code>webhook/</code> and paste its URL here. Each completed work session sends a POST with session data (date, duration, label) which the worker writes to your Notion database.
     </p>
     <div class="field--col">
-      <label for="sWebhook">Webhook URL</label>
-      <input type="url" id="sWebhook" placeholder="https://hook.eu1.make.com/…" />
+      <label for="sWebhook">Worker URL</label>
+      <div class="webhook-row">
+        <input type="url" id="sWebhook" placeholder="https://notion-widgets-webhook.<you>.workers.dev" />
+        <button class="btn-test" id="testBtn" type="button">Test</button>
+      </div>
+      <div class="test-result" id="testResult"></div>
     </div>
     <div class="field--col">
       <label for="sLabel">Session label</label>
@@ -532,6 +567,47 @@
     document.getElementById('closeSettings').addEventListener('click', closeSettings);
     document.getElementById('saveBtn').addEventListener('click', saveSettings);
     function closeSettings() { panel.classList.remove('is-open'); }
+
+    // ── Test webhook button ────────────────────────────────────
+    document.getElementById('testBtn').addEventListener('click', async function () {
+      const url = document.getElementById('sWebhook').value.trim();
+      const resultEl = document.getElementById('testResult');
+      if (!url) { resultEl.className = 'test-result err'; resultEl.textContent = '⚠ Enter a URL first'; return; }
+
+      this.disabled = true;
+      resultEl.className = 'test-result';
+      resultEl.textContent = 'Sending…';
+
+      const sample = {
+        date:        new Date().toISOString().slice(0, 10),
+        completedAt: new Date().toLocaleString(),
+        duration:    parseInt(document.getElementById('sWork').value) || 25,
+        type:        'Work',
+        label:       document.getElementById('sLabel').value.trim() || 'Test',
+        session:     0,
+      };
+
+      try {
+        const res = await fetch(url, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(sample),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (res.ok) {
+          resultEl.className   = 'test-result ok';
+          resultEl.textContent = `✓ Success${json.page_id ? ' — page created in Notion' : ''}`;
+        } else {
+          resultEl.className   = 'test-result err';
+          resultEl.textContent = `✗ ${json.message || json.error || `HTTP ${res.status}`}`;
+        }
+      } catch (err) {
+        resultEl.className   = 'test-result err';
+        resultEl.textContent = `✗ ${err.message}`;
+      }
+
+      this.disabled = false;
+    });
 
     // ── Toast ─────────────────────────────────────────────────
     const toastEl = document.getElementById('toast');

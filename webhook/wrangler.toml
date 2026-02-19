@@ -1,0 +1,17 @@
+name                = "notion-widgets-webhook"
+main                = "worker.js"
+compatibility_date  = "2024-09-01"
+
+# ── Secrets ────────────────────────────────────────────────────
+# Do NOT put secret values here. Set them via the CLI:
+#
+#   wrangler secret put NOTION_TOKEN
+#   wrangler secret put NOTION_DB_ID
+#
+# NOTION_TOKEN  → your Notion Internal Integration Secret
+#                 (starts with "ntn_" or "secret_")
+#                 Get it at: https://www.notion.so/my-integrations
+#
+# NOTION_DB_ID  → the 32-character ID from your database URL
+#                 notion.so/<workspace>/<DATABASE_ID>?v=...
+#                 Strip hyphens if copied from the UI.
