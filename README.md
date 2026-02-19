@@ -162,4 +162,5 @@ Browse and copy embed URLs from the **[live gallery →](https://lbsean.github.i
 | [Ambient Sounds](https://lbsean.github.io/NotionWidgets/widgets/ambient/) | ✅ | `https://lbsean.github.io/NotionWidgets/widgets/ambient/` |
 | [Heatmap](https://lbsean.github.io/NotionWidgets/widgets/heatmap/) | ✅ | `https://lbsean.github.io/NotionWidgets/widgets/heatmap/` |
 | [Weather](https://lbsean.github.io/NotionWidgets/widgets/weather/) | ✅ | `https://lbsean.github.io/NotionWidgets/widgets/weather/` |
+| [News](https://lbsean.github.io/NotionWidgets/widgets/news/) | ✅ | `https://lbsean.github.io/NotionWidgets/widgets/news/` |
 
