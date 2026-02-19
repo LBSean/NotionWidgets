@@ -13,9 +13,8 @@
  * Expected Notion database schema:
  *   Name           (Title)
  *   Date           (Date)
- *   Duration (min) (Number)
- *   Type           (Select  — option: "Work")
- *   Completed At   (Rich Text)
+ *   Duration (min) (Rich Text)
+ *   Type           (Rich Text)
  */
 
 const CORS = {
@@ -65,13 +64,10 @@ export default {
           date: { start: data.date || new Date().toISOString().slice(0, 10) },
         },
         'Duration (min)': {
-          number: typeof data.duration === 'number' ? data.duration : 25,
+          rich_text: [{ text: { content: String(typeof data.duration === 'number' ? data.duration : 25) } }],
         },
         'Type': {
-          select: { name: data.type || 'Work' },
-        },
-        'Completed At': {
-          rich_text: [{ text: { content: data.completedAt || '' } }],
+          rich_text: [{ text: { content: data.type || 'Work' } }],
         },
       },
     };
