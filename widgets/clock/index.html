@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clock</title>
+  <link rel="stylesheet" href="../../shared/base.css" />
+
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--color-text);
+    }
+
+    .clock {
+      text-align: center;
+      user-select: none;
+    }
+
+    .clock__time {
+      font-size: var(--font-size-2xl);
+      font-weight: 300;
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+
+    .clock__date {
+      margin-top: 0.35em;
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="clock">
+    <div class="clock__time" id="time">--:--:--</div>
+    <div class="clock__date" id="date">---</div>
+  </div>
+
+  <script>
+    const timeEl = document.getElementById('time');
+    const dateEl = document.getElementById('date');
+
+    const DAY_NAMES  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function tick() {
+      const now = new Date();
+      const h = pad(now.getHours());
+      const m = pad(now.getMinutes());
+      const s = pad(now.getSeconds());
+      timeEl.textContent = `${h}:${m}:${s}`;
+
+      const day   = DAY_NAMES[now.getDay()];
+      const month = MONTH_NAMES[now.getMonth()];
+      const date  = now.getDate();
+      const year  = now.getFullYear();
+      dateEl.textContent = `${day}, ${month} ${date} ${year}`;
+    }
+
+    tick();
+    setInterval(tick, 1000);
+  </script>
+
+</body>
+</html>

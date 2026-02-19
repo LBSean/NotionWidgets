@@ -1,0 +1,56 @@
+/* ─────────────────────────────────────────────
+   Notion Widget Base Styles
+   Import this in every widget with:
+   <link rel="stylesheet" href="../../shared/base.css">
+   ───────────────────────────────────────────── */
+
+/* Reset — removes the white box Notion shows around iframes */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  /* Transparent so the widget blends into Notion's background */
+  background: transparent;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── CSS Custom Properties ──────────────────── */
+:root {
+  /* Notion palette — override per-widget as needed */
+  --color-text:        #37352f;
+  --color-text-muted:  #6b7280;
+  --color-bg:          transparent;
+  --color-surface:     rgba(255, 255, 255, 0.06);
+  --color-border:      rgba(55, 53, 47, 0.09);
+  --color-accent:      #2eaadc;
+
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  16px;
+
+  --shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md:  0 4px 12px rgba(0, 0, 0, 0.12);
+
+  --font-size-xs:  0.75rem;
+  --font-size-sm:  0.875rem;
+  --font-size-md:  1rem;
+  --font-size-lg:  1.25rem;
+  --font-size-xl:  1.75rem;
+  --font-size-2xl: 2.5rem;
+}
+
+/* Dark-mode support — Notion switches its embed background too */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-text:       #e8e8e6;
+    --color-text-muted: #9b9a97;
+    --color-border:     rgba(255, 255, 255, 0.08);
+  }
+}

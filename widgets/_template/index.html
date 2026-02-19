@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Widget Name</title>
+
+  <!-- Shared resets + CSS variables -->
+  <link rel="stylesheet" href="../../shared/base.css" />
+
+  <style>
+    /* ── Widget-specific styles ────────────────
+       Keep all widget styles here, scoped to this file.
+       Use the CSS variables from base.css where possible.
+    ──────────────────────────────────────────── */
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      color: var(--color-text);
+    }
+
+    .widget {
+      /* Your widget's root container */
+    }
+  </style>
+</head>
+<body>
+
+  <div class="widget">
+    <!-- Widget markup goes here -->
+    <p>Hello from your new widget!</p>
+  </div>
+
+  <script>
+    // ── Widget logic ────────────────────────────
+    // Keep it self-contained — no external dependencies unless necessary.
+  </script>
+
+</body>
+</html>
