@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Countdown</title>
+  <link rel="stylesheet" href="../../shared/base.css" />
+
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100%;
+      padding: 1rem;
+    }
+
+    /* ── Ticker ───────────────────────────────────────── */
+    .ticker {
+      width: 100%;
+      text-align: center;
+    }
+
+    .ticker__direction {
+      font-size: 0.58rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      margin-bottom: 0.3rem;
+    }
+
+    .ticker__name {
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      color: var(--color-text);
+      margin-bottom: 1.1rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Big number rows */
+    .ticker__units {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 0;
+    }
+
+    .unit-block {
+      text-align: center;
+      min-width: 52px;
+    }
+
+    .unit-num {
+      font-size: clamp(2.4rem, 12vw, 4rem);
+      font-weight: 200;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      color: var(--color-text);
+      letter-spacing: -0.02em;
+    }
+
+    .unit-lbl {
+      font-size: 0.55rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .unit-sep {
+      font-size: clamp(2.4rem, 12vw, 4rem);
+      font-weight: 200;
+      line-height: 1;
+      color: var(--color-border);
+      padding: 0 2px;
+    }
+
+    .ticker__sub {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      margin-top: 0.5rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .ticker__date-label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      margin-top: 0.35rem;
+    }
+
+    /* "Today!" special state */
+    .ticker__today {
+      font-size: clamp(2.5rem, 14vw, 4.5rem);
+      font-weight: 700;
+      color: var(--color-accent);
+      margin-bottom: 0.4rem;
+      letter-spacing: -0.02em;
+    }
+
+    .ticker__gear {
+      margin-top: 1rem;
+    }
+
+    /* ── Setup prompt ─────────────────────────────────── */
+    .setup {
+      text-align: center;
+      color: var(--color-text-muted);
+    }
+
+    .setup p {
+      font-size: var(--font-size-sm);
+      margin-bottom: 0.8rem;
+    }
+
+    .btn-primary {
+      padding: 0.5em 1.2em;
+      background: var(--color-accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+
+    /* ── Settings panel ───────────────────────────────── */
+    .settings {
+      position: fixed;
+      inset: 0;
+      background: #fff;
+      padding: 1.3rem 1.4rem 1.6rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 10;
+      overflow-y: auto;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .settings { background: #191a1f; }
+    }
+
+    .settings.open { transform: translateY(0); }
+
+    .settings__head {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .settings__head h2 {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--color-text);
+    }
+
+    .btn-icon {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--color-text-muted);
+      font-size: 1rem;
+      padding: 2px 5px;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+    .btn-icon:hover { color: var(--color-text); }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .field label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+    }
+
+    .field input[type="text"],
+    .field input[type="date"] {
+      padding: 0.45em 0.65em;
+      border: 1.5px solid var(--color-border);
+      border-radius: 6px;
+      font-size: 0.88rem;
+      font-family: inherit;
+      color: var(--color-text);
+      background: transparent;
+      outline: none;
+      width: 100%;
+      transition: border-color 0.15s;
+    }
+    .field input:focus { border-color: var(--color-accent); }
+
+    .mode-row {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .mode-btn {
+      flex: 1;
+      padding: 0.45em;
+      border: 1.5px solid var(--color-border);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--color-text-muted);
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .mode-btn.active {
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+      background: rgba(46, 170, 220, 0.08);
+    }
+
+    .settings-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: auto;
+      padding-top: 0.3rem;
+    }
+
+    .btn-cancel {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--color-text-muted);
+      font-size: 0.82rem;
+    }
+    .btn-cancel:hover { color: var(--color-text); }
+  </style>
+</head>
+<body>
+
+  <!-- Dynamic main area -->
+  <div id="main"></div>
+
+  <!-- Settings panel -->
+  <div class="settings" id="settingsPanel">
+    <div class="settings__head">
+      <button class="btn-icon" id="cancelBtn">←</button>
+      <h2>Track an Event</h2>
+    </div>
+
+    <div class="field">
+      <label>Event Name</label>
+      <input type="text" id="sName" placeholder="e.g. Graduation Day" autocomplete="off" />
+    </div>
+
+    <div class="field">
+      <label>Target Date</label>
+      <input type="date" id="sDate" />
+    </div>
+
+    <div class="field">
+      <label>Mode</label>
+      <div class="mode-row">
+        <button class="mode-btn active" data-mode="until">Until (countdown)</button>
+        <button class="mode-btn"        data-mode="since">Since (count-up)</button>
+      </div>
+    </div>
+
+    <div class="settings-actions">
+      <button class="btn-cancel" id="cancelBtn2">Cancel</button>
+      <button class="btn-primary" id="saveBtn">Save</button>
+    </div>
+  </div>
+
+  <script>
+    const KEY = 'countdown-cfg';
+    let cfg      = null;
+    let tickerId = null;
+    let selMode  = 'until';
+
+    try { cfg = JSON.parse(localStorage.getItem(KEY)); } catch {}
+
+    const main  = document.getElementById('main');
+    const panel = document.getElementById('settingsPanel');
+
+    // ── Delegation on static containers ───────────────
+    main.addEventListener('click', e => {
+      if (e.target.id === 'gearBtn')  openSettings();
+      if (e.target.id === 'setupBtn') openSettings();
+    });
+
+    // ── Render ────────────────────────────────────────
+    function render() {
+      clearInterval(tickerId);
+      if (!cfg?.date || !cfg?.name) {
+        main.innerHTML = `
+          <div class="setup">
+            <p>No event configured.</p>
+            <button class="btn-primary" id="setupBtn">Set Up Event</button>
+          </div>`;
+        return;
+      }
+      renderTicker();
+      tickerId = setInterval(renderTicker, 1000);
+    }
+
+    function renderTicker() {
+      const target   = new Date(cfg.date + 'T00:00:00');
+      const now      = Date.now();
+      const rawDiff  = cfg.mode === 'until' ? +target - now : now - +target;
+      const absDiff  = Math.abs(rawDiff);
+      const isNeg    = rawDiff < 0; // event is in the past (for until) or future (for since)
+
+      const totalSec = Math.floor(absDiff / 1000);
+      const days  = Math.floor(totalSec / 86400);
+      const hrs   = Math.floor((totalSec % 86400) / 3600);
+      const mins  = Math.floor((totalSec % 3600) / 60);
+      const secs  = totalSec % 60;
+      const pad   = n => String(n).padStart(2, '0');
+
+      const dateLabel = new Date(cfg.date + 'T12:00:00').toLocaleDateString(undefined,
+        { month: 'long', day: 'numeric', year: 'numeric' });
+
+      let direction, numHTML, subHTML = '';
+
+      if (!isNeg && totalSec === 0) {
+        // Exact moment of event
+        main.innerHTML = `
+          <div class="ticker">
+            <div class="ticker__name">${esc(cfg.name)}</div>
+            <div class="ticker__today">Today!</div>
+            <div class="ticker__date-label">${dateLabel}</div>
+            <div class="ticker__gear"><button class="btn-icon" id="gearBtn">⚙</button></div>
+          </div>`;
+        return;
+      }
+
+      if (cfg.mode === 'until') {
+        direction = isNeg ? 'since' : 'until';
+      } else {
+        direction = isNeg ? 'until' : 'since';
+      }
+
+      if (days >= 1) {
+        numHTML = `
+          <div class="unit-block">
+            <div class="unit-num">${days}</div>
+            <div class="unit-lbl">${days === 1 ? 'day' : 'days'}</div>
+          </div>`;
+        subHTML = `<div class="ticker__sub">${pad(hrs)}h  ${pad(mins)}m  ${pad(secs)}s</div>`;
+      } else {
+        numHTML = `
+          <div class="unit-block">
+            <div class="unit-num">${pad(hrs)}</div>
+            <div class="unit-lbl">hrs</div>
+          </div>
+          <div class="unit-sep">:</div>
+          <div class="unit-block">
+            <div class="unit-num">${pad(mins)}</div>
+            <div class="unit-lbl">min</div>
+          </div>
+          <div class="unit-sep">:</div>
+          <div class="unit-block">
+            <div class="unit-num">${pad(secs)}</div>
+            <div class="unit-lbl">sec</div>
+          </div>`;
+      }
+
+      main.innerHTML = `
+        <div class="ticker">
+          <div class="ticker__direction">${direction}</div>
+          <div class="ticker__name">${esc(cfg.name)}</div>
+          <div class="ticker__units">${numHTML}</div>
+          ${subHTML}
+          <div class="ticker__date-label">${dateLabel}</div>
+          <div class="ticker__gear"><button class="btn-icon" id="gearBtn">⚙</button></div>
+        </div>`;
+    }
+
+    function esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── Settings ──────────────────────────────────────
+    function openSettings() {
+      document.getElementById('sName').value = cfg?.name || '';
+      document.getElementById('sDate').value = cfg?.date || '';
+      selMode = cfg?.mode || 'until';
+      updateModeBtns();
+      panel.classList.add('open');
+    }
+
+    function closeSettings() { panel.classList.remove('open'); }
+
+    function updateModeBtns() {
+      document.querySelectorAll('.mode-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.mode === selMode));
+    }
+
+    document.querySelectorAll('.mode-btn').forEach(b =>
+      b.addEventListener('click', () => { selMode = b.dataset.mode; updateModeBtns(); }));
+
+    document.getElementById('cancelBtn').addEventListener('click', closeSettings);
+    document.getElementById('cancelBtn2').addEventListener('click', closeSettings);
+
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      const name = document.getElementById('sName').value.trim();
+      const date = document.getElementById('sDate').value;
+      if (!name || !date) return;
+      cfg = { name, date, mode: selMode };
+      localStorage.setItem(KEY, JSON.stringify(cfg));
+      closeSettings();
+      render();
+    });
+
+    // ── Init ──────────────────────────────────────────
+    render();
+  </script>
+</body>
+</html>

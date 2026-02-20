@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sticky Note</title>
+  <link rel="stylesheet" href="../../shared/base.css" />
+
+  <style>
+    body {
+      background: #fefce8;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 0.75rem 1rem 0.55rem;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body { background: #2a270f; }
+      textarea { color: #e8e3c0; }
+      .title, .word-count { color: #c4a83a; }
+      .icon-btn { color: #c4a83a; }
+      textarea::placeholder { color: #7a6820; }
+    }
+
+    /* ── Header ──────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      margin-bottom: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    .title {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #a16207;
+      flex: 1;
+    }
+
+    .icon-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #a16207;
+      font-size: 1.1rem;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      line-height: 1;
+      transition: background 0.15s, color 0.15s;
+    }
+    .icon-btn:hover { background: rgba(0,0,0,0.07); }
+    .icon-btn.danger { color: #dc2626; }
+
+    /* ── Note area ───────────────────────────────────── */
+    textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      resize: none;
+      font-family: inherit;
+      font-size: 0.9rem;
+      color: #1c1917;
+      line-height: 1.7;
+      width: 100%;
+      min-height: 0;
+    }
+
+    textarea::placeholder { color: #d4c46a; }
+
+    /* ── Footer ──────────────────────────────────────── */
+    .footer {
+      display: flex;
+      align-items: center;
+      padding-top: 0.3rem;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    .saved-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #4ade80;
+      opacity: 0;
+      transition: opacity 0.3s;
+      flex-shrink: 0;
+    }
+    .saved-dot.show { opacity: 1; }
+
+    .word-count {
+      font-size: 0.62rem;
+      color: #a16207;
+      opacity: 0.5;
+      margin-left: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <span class="title">Note</span>
+    <button class="icon-btn" id="clearBtn" title="Clear note">×</button>
+  </div>
+
+  <textarea id="noteArea" placeholder="Capture a thought…" spellcheck="true"></textarea>
+
+  <div class="footer">
+    <span class="saved-dot" id="savedDot"></span>
+    <span class="word-count" id="wordCount"></span>
+  </div>
+
+  <script>
+    const KEY      = 'sticky-note';
+    const ta       = document.getElementById('noteArea');
+    const wcEl     = document.getElementById('wordCount');
+    const savedDot = document.getElementById('savedDot');
+    const clearBtn = document.getElementById('clearBtn');
+
+    // ── Load ──────────────────────────────────────────
+    ta.value = localStorage.getItem(KEY) || '';
+    updateWc();
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+
+    // ── Auto-save (debounced 700 ms) ──────────────────
+    let saveTimer;
+    ta.addEventListener('input', () => {
+      updateWc();
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(persist, 700);
+    });
+
+    function persist() {
+      localStorage.setItem(KEY, ta.value);
+      flashSaved();
+    }
+
+    function flashSaved() {
+      savedDot.classList.add('show');
+      clearTimeout(savedDot._t);
+      savedDot._t = setTimeout(() => savedDot.classList.remove('show'), 1600);
+    }
+
+    function updateWc() {
+      const words = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
+      wcEl.textContent = words > 0 ? `${words}w` : '';
+    }
+
+    // ── Two-click clear ───────────────────────────────
+    let pendingClear = false, clearTimer;
+
+    clearBtn.addEventListener('click', () => {
+      if (!ta.value) return;
+      if (!pendingClear) {
+        pendingClear = true;
+        clearBtn.textContent = '?';
+        clearBtn.classList.add('danger');
+        clearTimer = setTimeout(cancelClear, 2500);
+      } else {
+        cancelClear();
+        ta.value = '';
+        persist();
+        updateWc();
+        ta.focus();
+      }
+    });
+
+    function cancelClear() {
+      pendingClear = false;
+      clearTimeout(clearTimer);
+      clearBtn.textContent = '×';
+      clearBtn.classList.remove('danger');
+    }
+  </script>
+</body>
+</html>

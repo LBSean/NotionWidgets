@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Eisenhower Matrix</title>
+  <link rel="stylesheet" href="../../shared/base.css" />
+
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 0.6rem;
+      gap: 0.4rem;
+      overflow: hidden;
+    }
+
+    /* ── Axis header ─────────────────────────────────── */
+    .axis-x {
+      display: grid;
+      grid-template-columns: 22px 1fr 1fr;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+    .axis-x-spacer { /* empty corner */ }
+    .axis-label {
+      font-size: 0.55rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      text-align: center;
+      opacity: 0.65;
+    }
+
+    /* ── Grid body ───────────────────────────────────── */
+    .matrix-body {
+      display: grid;
+      grid-template-columns: 22px 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 3px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Rotated Y-axis labels */
+    .axis-y {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .axis-y-label {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .axis-y-label span {
+      font-size: 0.52rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      opacity: 0.65;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      white-space: nowrap;
+    }
+
+    /* ── Quadrant ─────────────────────────────────────── */
+    .quadrant {
+      display: flex;
+      flex-direction: column;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1.5px solid var(--qbd, #e5e7eb);
+      background: var(--qbg, #f9fafb);
+      transition: border-color 0.2s;
+    }
+
+    .quadrant.drag-over {
+      border-style: dashed;
+      border-color: var(--qa, #9ca3af) !important;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .quadrant[data-q="q1"] { --qbg: #2d1515; --qbd: #5c2020; }
+      .quadrant[data-q="q2"] { --qbg: #15202d; --qbd: #1e3a58; }
+      .quadrant[data-q="q3"] { --qbg: #2d1e10; --qbd: #5c3810; }
+      .quadrant[data-q="q4"] { --qbg: #1a1c20; --qbd: #2d3238; }
+    }
+
+    /* Quadrant header */
+    .q-head {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.3rem 0.4rem 0.25rem;
+      border-bottom: 1px solid var(--qbd, #e5e7eb);
+      flex-shrink: 0;
+    }
+
+    .q-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--qa, #9ca3af);
+      flex-shrink: 0;
+    }
+
+    .q-title {
+      font-size: 0.58rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--qa, #9ca3af);
+      flex: 1;
+    }
+
+    .q-add-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--qa, #9ca3af);
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0 2px;
+      opacity: 0.7;
+      transition: opacity 0.15s;
+    }
+    .q-add-btn:hover { opacity: 1; }
+
+    /* Add task input */
+    .q-input-wrap {
+      padding: 0.25rem 0.35rem;
+      border-bottom: 1px solid var(--qbd, #e5e7eb);
+      flex-shrink: 0;
+    }
+    .q-input-wrap.hidden { display: none; }
+
+    .q-input {
+      width: 100%;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 0.76rem;
+      color: var(--color-text);
+    }
+    .q-input::placeholder { color: var(--color-text-muted); opacity: 0.5; }
+
+    /* Task list */
+    .q-tasks {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.2rem 0.3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .task-item {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.2rem 0.25rem;
+      border-radius: 4px;
+      cursor: grab;
+    }
+    .task-item:hover { background: rgba(0,0,0,0.05); }
+    .task-item.dragging { opacity: 0.35; }
+
+    @media (prefers-color-scheme: dark) {
+      .task-item:hover { background: rgba(255,255,255,0.06); }
+    }
+
+    .task-text {
+      flex: 1;
+      font-size: 0.76rem;
+      color: var(--color-text);
+      word-break: break-word;
+      cursor: text;
+      min-width: 0;
+    }
+
+    .task-edit-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 0.76rem;
+      color: var(--color-text);
+      min-width: 0;
+    }
+
+    .task-del {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--color-text-muted);
+      font-size: 0.8rem;
+      line-height: 1;
+      padding: 1px 2px;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+    .task-item:hover .task-del { opacity: 0.6; }
+    .task-del:hover { color: #ef4444; opacity: 1 !important; }
+  </style>
+</head>
+<body>
+
+  <!-- X-axis labels -->
+  <div class="axis-x">
+    <div class="axis-x-spacer"></div>
+    <div class="axis-label">Urgent</div>
+    <div class="axis-label">Not Urgent</div>
+  </div>
+
+  <!-- Matrix body: Y-axis + 2×2 quadrants -->
+  <div class="matrix-body">
+    <!-- Y-axis -->
+    <div class="axis-y">
+      <div class="axis-y-label"><span>Important</span></div>
+      <div class="axis-y-label"><span>Not Important</span></div>
+    </div>
+    <!-- Quadrants (rendered by JS) -->
+    <div id="q1" class="quadrant" data-q="q1" style="--qa:#ef4444;--qbg:#fff5f5;--qbd:#fecaca"></div>
+    <div id="q2" class="quadrant" data-q="q2" style="--qa:#3b82f6;--qbg:#eff6ff;--qbd:#bfdbfe"></div>
+    <div id="q3" class="quadrant" data-q="q3" style="--qa:#f97316;--qbg:#fff7ed;--qbd:#fed7aa"></div>
+    <div id="q4" class="quadrant" data-q="q4" style="--qa:#6b7280;--qbg:#f9fafb;--qbd:#e5e7eb"></div>
+  </div>
+
+  <script>
+    // ── Config ────────────────────────────────────────
+    const QUADS = [
+      { id: 'q1', title: 'DO',       sub: 'Urgent & Important'        },
+      { id: 'q2', title: 'PLAN',     sub: 'Important, Not Urgent'     },
+      { id: 'q3', title: 'DELEGATE', sub: 'Urgent, Not Important'     },
+      { id: 'q4', title: 'DROP',     sub: 'Not Urgent, Not Important' },
+    ];
+
+    // ── State ─────────────────────────────────────────
+    let tasks = { q1: [], q2: [], q3: [], q4: [] };
+
+    function load() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('matrix-tasks') || '{}');
+        tasks = { ...tasks, ...saved };
+      } catch {}
+    }
+
+    function save() {
+      localStorage.setItem('matrix-tasks', JSON.stringify(tasks));
+    }
+
+    function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+    // ── Drag state ────────────────────────────────────
+    let dragSrc = null; // { qid, taskId }
+
+    // ── Render a single quadrant ──────────────────────
+    function renderQ(qid) {
+      const el   = document.getElementById(qid);
+      const meta = QUADS.find(q => q.id === qid);
+
+      // Preserve input state if open
+      const inputWrap = el.querySelector('.q-input-wrap');
+      const inputOpen = inputWrap && !inputWrap.classList.contains('hidden');
+
+      el.innerHTML = `
+        <div class="q-head">
+          <span class="q-dot"></span>
+          <span class="q-title" title="${meta.sub}">${meta.title}</span>
+          <button class="q-add-btn" data-qid="${qid}" title="Add task">+</button>
+        </div>
+        <div class="q-input-wrap${inputOpen ? '' : ' hidden'}" data-qid="${qid}">
+          <input class="q-input" type="text" placeholder="Add task, press Enter…" />
+        </div>
+        <div class="q-tasks" data-qid="${qid}">
+          ${tasks[qid].map(t => taskHTML(t)).join('')}
+        </div>
+      `;
+
+      // Re-bind events
+      bindQ(el, qid);
+
+      if (inputOpen) {
+        const inp = el.querySelector('.q-input');
+        inp.focus();
+      }
+    }
+
+    function taskHTML(t) {
+      return `
+        <div class="task-item" draggable="true" data-id="${t.id}">
+          <span class="task-text">${esc(t.text)}</span>
+          <button class="task-del" data-id="${t.id}" title="Delete">×</button>
+        </div>`;
+    }
+
+    function renderAll() { QUADS.forEach(q => renderQ(q.id)); }
+
+    // ── Bind events to a quadrant element ─────────────
+    function bindQ(el, qid) {
+      // Add button
+      el.querySelector('.q-add-btn').addEventListener('click', () => {
+        const wrap = el.querySelector('.q-input-wrap');
+        wrap.classList.remove('hidden');
+        el.querySelector('.q-input').focus();
+      });
+
+      // Input: Enter = save, Escape = cancel, blur = save if non-empty
+      const inp = el.querySelector('.q-input');
+      if (inp) {
+        inp.addEventListener('keydown', e => {
+          if (e.key === 'Enter')  { e.preventDefault(); commitAdd(qid, inp); }
+          if (e.key === 'Escape') { cancelAdd(el); }
+        });
+        inp.addEventListener('blur', () => { commitAdd(qid, inp); });
+      }
+
+      // Task text: click to edit inline
+      el.querySelectorAll('.task-text').forEach(span => {
+        span.addEventListener('click', () => startEdit(el, qid, span));
+      });
+
+      // Delete buttons
+      el.querySelectorAll('.task-del').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          tasks[qid] = tasks[qid].filter(t => t.id !== btn.dataset.id);
+          save();
+          renderQ(qid);
+        });
+      });
+
+      // ── Drag events ──────────────────────────────────
+      el.querySelectorAll('.task-item').forEach(item => {
+        item.addEventListener('dragstart', e => {
+          dragSrc = { qid, taskId: item.dataset.id };
+          item.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        item.addEventListener('dragend', () => item.classList.remove('dragging'));
+      });
+
+      el.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        el.classList.add('drag-over');
+      });
+      el.addEventListener('dragleave', e => {
+        if (!el.contains(e.relatedTarget)) el.classList.remove('drag-over');
+      });
+      el.addEventListener('drop', e => {
+        e.preventDefault();
+        el.classList.remove('drag-over');
+        if (!dragSrc || dragSrc.qid === qid) { dragSrc = null; return; }
+        const srcArr  = tasks[dragSrc.qid];
+        const idx     = srcArr.findIndex(t => t.id === dragSrc.taskId);
+        if (idx >= 0) {
+          const [moved] = srcArr.splice(idx, 1);
+          tasks[qid].push(moved);
+          save();
+          renderAll();
+        }
+        dragSrc = null;
+      });
+    }
+
+    // ── Inline add ────────────────────────────────────
+    function commitAdd(qid, inp) {
+      const text = inp.value.trim();
+      if (text) {
+        tasks[qid].push({ id: uid(), text });
+        save();
+      }
+      renderQ(qid);
+    }
+
+    function cancelAdd(el) {
+      el.querySelector('.q-input-wrap')?.classList.add('hidden');
+      if (el.querySelector('.q-input')) el.querySelector('.q-input').value = '';
+    }
+
+    // ── Inline edit ───────────────────────────────────
+    function startEdit(el, qid, span) {
+      const taskId = span.closest('.task-item').dataset.id;
+      const task   = tasks[qid].find(t => t.id === taskId);
+      if (!task) return;
+
+      const input = document.createElement('input');
+      input.className = 'task-edit-input';
+      input.value     = task.text;
+      span.replaceWith(input);
+      input.focus();
+      input.select();
+
+      const commit = () => {
+        const newText = input.value.trim();
+        if (newText) task.text = newText;
+        save();
+        renderQ(qid);
+      };
+
+      input.addEventListener('blur',    commit);
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+        if (e.key === 'Escape') { renderQ(qid); }
+      });
+    }
+
+    function esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── Init ──────────────────────────────────────────
+    load();
+    renderAll();
+  </script>
+</body>
+</html>
