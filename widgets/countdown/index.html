@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Countdown</title>
   <link rel="stylesheet" href="../../shared/base.css" />
+  <script src="../../shared/theme.js"></script>
 
   <style>
     body {
@@ -147,6 +148,9 @@
       .settings { background: #191a1f; }
     }
 
+    html[data-theme="dark"]  .settings { background: #191a1f; }
+    html[data-theme="light"] .settings { background: #fff; }
+
     .settings.open { transform: translateY(0); }
 
     .settings__head {
@@ -244,6 +248,12 @@
   </style>
 </head>
 <body>
+
+  <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
+    <span class="theme-switch__icon">☀</span>
+    <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
+    <span class="theme-switch__icon">🌙</span>
+  </button>
 
   <!-- Dynamic main area -->
   <div id="main"></div>

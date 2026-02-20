@@ -54,3 +54,57 @@ html, body {
     --color-border:     rgba(255, 255, 255, 0.08);
   }
 }
+
+/* ── Manual theme overrides (data-theme on <html>) ──── */
+html[data-theme="dark"] {
+  --color-text:       #e8e8e6;
+  --color-text-muted: #9b9a97;
+  --color-border:     rgba(255, 255, 255, 0.08);
+}
+html[data-theme="light"] {
+  --color-text:       #37352f;
+  --color-text-muted: #6b7280;
+  --color-border:     rgba(55, 53, 47, 0.09);
+}
+
+/* ── Theme toggle switch (shared across all widgets) ── */
+.theme-switch {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.45;
+  transition: opacity 0.2s;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+}
+.theme-switch:hover { opacity: 1; }
+.theme-switch__icon { font-size: 0.6rem; line-height: 1; }
+.theme-switch__track {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 99px;
+  background: #bbb;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.theme-switch__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+html[data-theme="dark"] .theme-switch__track { background: #4a6fa5; }
+html[data-theme="dark"] .theme-switch__thumb { transform: translateX(12px); }

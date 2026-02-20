@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pomodoro Timer</title>
   <link rel="stylesheet" href="../../shared/base.css" />
+  <script src="../../shared/theme.js"></script>
 
   <style>
     /* ── Mode colour tokens ───────────────────────────────────── */
@@ -389,9 +390,43 @@
       z-index: 99;
     }
     .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ── Dark mode: timer body colour tokens ─────────────── */
+    html[data-theme="dark"] body                          { --c-bg: #1f1210; --c-text: #f0d8d0; --c-surface: #2a1614; --c-border: #4a2020; }
+    html[data-theme="dark"] body[data-mode="break"]       { --c-bg: #0f1a24; --c-text: #d0e4f4; --c-surface: #152332; --c-border: #1e3a58; }
+    html[data-theme="dark"] body[data-mode="longBreak"]   { --c-bg: #0d1f16; --c-text: #c8e8d8; --c-surface: #142a1d; --c-border: #1a4030; }
+    html[data-theme="dark"] body[data-mode="eyeBreak"]    { --c-bg: #1e1600; --c-text: #f0e0b0; --c-surface: #2a2000; --c-border: #4a3800; }
+
+    /* ── Dark mode: settings panel ───────────────────────── */
+    html[data-theme="dark"]  .settings                    { background: #1a1b22; color: #e0e0e8; }
+    html[data-theme="dark"]  .settings__head h2,
+    html[data-theme="dark"]  .field label,
+    html[data-theme="dark"]  .toggle-wrap label,
+    html[data-theme="dark"]  .field--col label            { color: #c8c8d4; }
+    html[data-theme="dark"]  .section-title               { color: #555566; }
+    html[data-theme="dark"]  .hint                        { color: #555566; }
+    html[data-theme="dark"]  .field .unit                 { color: #555566; }
+    html[data-theme="dark"]  .preset-btn                  { background: #252530; border-color: #38384a; color: #a0a0b8; }
+    html[data-theme="dark"]  .preset-btn span             { color: #555566; }
+    html[data-theme="dark"]  .preset-btn.is-active        { background: #1a2c40; border-color: #2d6a9f; color: #4a9eda; }
+    html[data-theme="dark"]  .preset-btn.is-active span   { color: #4a9eda; }
+    html[data-theme="dark"]  .preset-btn:hover:not(.is-active) { background: #2e2e3e; border-color: #4a4a60; }
+    html[data-theme="dark"]  .field input[type="number"],
+    html[data-theme="dark"]  .field--col input[type="url"],
+    html[data-theme="dark"]  .field--col input[type="text"] { background: #252530; border-color: #38384a; color: #e0e0e8; }
+    html[data-theme="dark"]  .micro-fields                { border-left-color: #38384a; }
+    html[data-theme="dark"]  .toggle-track                { background: #444455; }
+    html[data-theme="dark"]  .btn-test                    { background: #252530; border-color: #38384a; color: #a0a0b8; }
+    html[data-theme="light"] .settings                    { background: #fff; }
   </style>
 </head>
 <body data-mode="work">
+
+  <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
+    <span class="theme-switch__icon">☀</span>
+    <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
+    <span class="theme-switch__icon">🌙</span>
+  </button>
 
   <!-- ── Main timer ──────────────────────────────────────────── -->
   <div class="pomo">

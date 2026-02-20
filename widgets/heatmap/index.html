@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Heatmap</title>
   <link rel="stylesheet" href="../../shared/base.css" />
+  <script src="../../shared/theme.js"></script>
 
   <style>
     body {
@@ -188,9 +189,20 @@
     @media (prefers-color-scheme: dark) {
       .legend-cell.off { background: #21262d; }
     }
+
+    html[data-theme="dark"]  .cell            { background: #21262d; }
+    html[data-theme="light"] .cell            { background: #ebedf0; }
+    html[data-theme="dark"]  .legend-cell.off { background: #21262d; }
+    html[data-theme="light"] .legend-cell.off { background: #ebedf0; }
   </style>
 </head>
 <body>
+
+  <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
+    <span class="theme-switch__icon">☀</span>
+    <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
+    <span class="theme-switch__icon">🌙</span>
+  </button>
 
   <!-- Rendered entirely by JS -->
   <div id="root"></div>

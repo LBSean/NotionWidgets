@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sticky Note</title>
   <link rel="stylesheet" href="../../shared/base.css" />
+  <script src="../../shared/theme.js"></script>
 
   <style>
     body {
@@ -102,9 +103,27 @@
       .title, .word-count { color: #c4a83a; }
       .icon-btn { color: #c4a83a; }
     }
+
+    html[data-theme="dark"]  body                   { background: #2a270f; }
+    html[data-theme="dark"]  textarea               { color: #e8e3c0; }
+    html[data-theme="dark"]  textarea::placeholder  { color: #7a6820; }
+    html[data-theme="dark"]  .title,
+    html[data-theme="dark"]  .word-count            { color: #c4a83a; }
+    html[data-theme="dark"]  .icon-btn              { color: #c4a83a; }
+    html[data-theme="light"] body                   { background: #fefce8; }
+    html[data-theme="light"] textarea               { color: #1c1917; }
+    html[data-theme="light"] .title,
+    html[data-theme="light"] .word-count            { color: #a16207; }
+    html[data-theme="light"] .icon-btn              { color: #a16207; }
   </style>
 </head>
 <body>
+
+  <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
+    <span class="theme-switch__icon">☀</span>
+    <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
+    <span class="theme-switch__icon">🌙</span>
+  </button>
 
   <div class="header">
     <span class="title">Note</span>

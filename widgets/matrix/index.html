@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Eisenhower Matrix</title>
   <link rel="stylesheet" href="../../shared/base.css" />
+  <script src="../../shared/theme.js"></script>
 
   <style>
     body {
@@ -91,6 +92,23 @@
       .quadrant[data-q="q3"] { --qbg: #2d1e10; --qbd: #5c3810; }
       .quadrant[data-q="q4"] { --qbg: #1a1c20; --qbd: #2d3238; }
     }
+
+    html[data-theme="dark"] .quadrant[data-q="q1"] { --qbg: #2d1515; --qbd: #5c2020; }
+    html[data-theme="dark"] .quadrant[data-q="q2"] { --qbg: #15202d; --qbd: #1e3a58; }
+    html[data-theme="dark"] .quadrant[data-q="q3"] { --qbg: #2d1e10; --qbd: #5c3810; }
+    html[data-theme="dark"] .quadrant[data-q="q4"] { --qbg: #1a1c20; --qbd: #2d3238; }
+    html[data-theme="light"] .quadrant[data-q="q1"] { --qbg: #fff5f5; --qbd: #fecaca; }
+    html[data-theme="light"] .quadrant[data-q="q2"] { --qbg: #eff6ff; --qbd: #bfdbfe; }
+    html[data-theme="light"] .quadrant[data-q="q3"] { --qbg: #fff7ed; --qbd: #fed7aa; }
+    html[data-theme="light"] .quadrant[data-q="q4"] { --qbg: #f9fafb; --qbd: #e5e7eb; }
+
+    /* Explicit text colours per theme (contrast fix) */
+    html[data-theme="light"] .task-text,
+    html[data-theme="light"] .q-input,
+    html[data-theme="light"] .task-edit-input { color: #111; }
+    html[data-theme="dark"]  .task-text,
+    html[data-theme="dark"]  .q-input,
+    html[data-theme="dark"]  .task-edit-input { color: #e8e8e6; }
 
     /* Quadrant header */
     .q-head {
@@ -213,6 +231,12 @@
   </style>
 </head>
 <body>
+
+  <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
+    <span class="theme-switch__icon">☀</span>
+    <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
+    <span class="theme-switch__icon">🌙</span>
+  </button>
 
   <!-- X-axis labels -->
   <div class="axis-x">
