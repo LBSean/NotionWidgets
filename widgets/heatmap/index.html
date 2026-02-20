@@ -513,11 +513,10 @@
       border-radius: 10px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.18);
       padding: 0.8rem 1rem;
-      min-width: 210px;
-      max-width: 280px;
-      display: flex;
+      min-width: 230px;
+      max-width: 300px;
       flex-direction: column;
-      gap: 0.45rem;
+      gap: 0.35rem;
       transition: opacity 0.1s;
     }
 
@@ -536,50 +535,105 @@
     .log-row {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.5rem;
+      padding: 0.2rem 0;
+    }
+
+    .log-toggle {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      border: 2px solid var(--toggle-color);
+      background: transparent;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      line-height: 1;
+      color: transparent;
+      transition: background 0.15s, color 0.15s;
+      padding: 0;
+    }
+    .log-toggle.checked {
+      background: var(--toggle-color);
+      color: #fff;
     }
 
     .log-dot {
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       flex-shrink: 0;
     }
 
     .log-name {
       font-size: 0.68rem;
-      color: var(--color-text-muted);
-      width: 72px;
-      flex-shrink: 0;
+      color: var(--color-text);
+      flex: 1;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    .log-row input[type="range"] {
+    .log-pct {
+      font-size: 0.62rem;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      flex-shrink: 0;
+      cursor: pointer;
+      border-radius: 3px;
+      padding: 0.15rem 0.35rem;
+      transition: background 0.15s;
+      min-width: 32px;
+      text-align: center;
+    }
+    .log-pct:hover { background: var(--color-border); }
+    .log-pct.open  { background: var(--color-border); }
+
+    .log-slider-wrap {
+      display: none;
+      padding: 0 0 0.3rem 26px;
+    }
+    .log-slider-wrap.open {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .log-slider-wrap input[type="range"] {
       flex: 1;
       cursor: pointer;
       min-width: 0;
     }
 
-    .log-pct {
-      font-size: 0.65rem;
-      font-weight: 600;
-      color: var(--color-text);
-      width: 28px;
-      text-align: right;
-      flex-shrink: 0;
+    .log-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 0.2rem;
+      padding-top: 0.3rem;
+      border-top: 1px solid var(--color-border);
     }
 
+    .log-manage {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 0.62rem;
+      color: var(--color-text-muted);
+      padding: 0.2em 0;
+      transition: color 0.15s;
+    }
+    .log-manage:hover { color: var(--color-text); }
+
     .log-close {
-      align-self: flex-end;
-      margin-top: 0.15rem;
       padding: 0.28em 0.8em;
       background: var(--color-accent);
       color: #fff;
       border: none;
       border-radius: 6px;
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       font-weight: 600;
       cursor: pointer;
     }
@@ -812,10 +866,13 @@
   </div>
 
   <!-- Log popup -->
-  <div class="log-popup" id="logPopup" hidden>
+  <div class="log-popup" id="logPopup" style="display:none">
     <div class="log-date" id="logDate"></div>
     <div class="log-habits" id="logHabits"></div>
-    <button class="log-close" id="logClose">Done</button>
+    <div class="log-footer">
+      <button class="log-manage" id="logManage" title="Manage categories">⚙ Categories</button>
+      <button class="log-close" id="logClose">Done</button>
+    </div>
   </div>
 
   <!-- Tooltip -->
@@ -967,7 +1024,7 @@
     // ── Stats helpers ─────────────────────────────────────────
     function countActiveDays(data) {
       return Object.values(data).filter(day =>
-        Object.values(day).some(p => p > 0)
+        day && typeof day === 'object' && Object.values(day).some(p => p > 0)
       ).length;
     }
 
@@ -1023,7 +1080,7 @@
       let lastDate = null;
       for (const dateStr of dates) {
         const day = data[dateStr];
-        if (Object.values(day).some(p => p > 0)) {
+        if (day && typeof day === 'object' && Object.values(day).some(p => p > 0)) {
           if (!lastDate || isConsecutive(lastDate, dateStr)) {
             currentStreak++;
           } else {
@@ -1048,7 +1105,7 @@
       const dayCount = [0, 0, 0, 0, 0, 0, 0];
       for (const dateStr of Object.keys(data)) {
         const day = data[dateStr];
-        if (Object.values(day).some(p => p > 0)) {
+        if (day && typeof day === 'object' && Object.values(day).some(p => p > 0)) {
           const d = new Date(dateStr + 'T12:00:00');
           dayCount[d.getDay()]++;
         }
@@ -1108,7 +1165,7 @@
       const monthsHTML = groups.map(group => {
         const weeksHTML = group.weeks.map(week => {
           const cellsHTML = week.map(d => {
-            if (!d) return `<div class="cell is-empty"></div>`;
+            if (!d || d.getMonth() !== group.mi) return `<div class="cell is-empty"></div>`;
             const key = iso(d);
             const lv  = dayLevel(data, key);
             const cls = `cell lv${lv}${isToday(d) ? ' is-today' : ''}`;
@@ -1222,18 +1279,6 @@
           viewMode = 'month';
           viewMonth = parseInt(label.dataset.month);
           renderMonth();
-        });
-      });
-
-      // Week clicks → switch to week view
-      document.querySelectorAll('.hm-week').forEach(week => {
-        week.addEventListener('click', e => {
-          if (!e.target.closest('.cell')) return;
-          const cell = e.target.closest('.cell');
-          const dateKey = cell.dataset.date;
-          viewMode = 'week';
-          viewWeekStart = getMondayOfWeek(new Date(dateKey + 'T12:00:00'));
-          renderWeek();
         });
       });
 
@@ -1417,10 +1462,12 @@
       document.getElementById('backToYearBtnWeek').addEventListener('click', () => { viewMode = 'year'; renderYear(); });
       document.getElementById('weekPrev').addEventListener('click', () => {
         viewWeekStart.setDate(viewWeekStart.getDate() - 7);
+        viewYear = viewWeekStart.getFullYear();
         renderWeek();
       });
       document.getElementById('weekNext').addEventListener('click', () => {
         viewWeekStart.setDate(viewWeekStart.getDate() + 7);
+        viewYear = viewWeekStart.getFullYear();
         renderWeek();
       });
 
@@ -1451,6 +1498,22 @@
     let popupYear    = null;
     let popupData    = null;
 
+    // Helper: save a value and update the heatmap cell in-place
+    function saveAndUpdateCell(dateKey, catId, value) {
+      const year = parseInt(dateKey.slice(0, 4));
+      if (!popupData[dateKey]) popupData[dateKey] = {};
+      popupData[dateKey][catId] = value;
+      saveData(year, popupData);
+
+      const cell = document.querySelector(`.cell[data-date="${dateKey}"]`);
+      if (cell) {
+        const lv  = dayLevel(popupData, dateKey);
+        const tod = isToday(new Date(dateKey + 'T12:00:00')) ? ' is-today' : '';
+        const extra = cell.classList.contains('month-cell') ? 'month-cell ' : '';
+        cell.className = `${extra}cell lv${lv}${tod}`;
+      }
+    }
+
     function openPopup(dateKey, cellEl) {
       popupDateKey = dateKey;
       popupYear    = parseInt(dateKey.slice(0, 4));
@@ -1461,12 +1524,19 @@
       logDateEl.textContent = d.toLocaleDateString(undefined,
         { month: 'long', day: 'numeric', year: 'numeric' });
 
-      // One row per category
+      // One row per category: toggle + dot + name + pct (click for slider)
       logHabits.innerHTML = '';
       cfg.categories.forEach(cat => {
         const val = popupData[dateKey]?.[cat.id] ?? 0;
+
+        // ── Main row: [✓] ● Name                 75%
         const row = document.createElement('div');
         row.className = 'log-row';
+
+        const toggle = document.createElement('button');
+        toggle.className = 'log-toggle' + (val > 0 ? ' checked' : '');
+        toggle.style.setProperty('--toggle-color', cat.color);
+        toggle.textContent = '✓';
 
         const dot = document.createElement('span');
         dot.className = 'log-dot';
@@ -1477,47 +1547,61 @@
         name.textContent = cat.name;
         name.title = cat.name;
 
-        const slider = document.createElement('input');
-        slider.type  = 'range';
-        slider.min   = '0';
-        slider.max   = '100';
-        slider.step  = '25';
-        slider.value = String(val);
-        slider.style.accentColor = cat.color;
-
         const pct = document.createElement('span');
         pct.className = 'log-pct';
         pct.textContent = val + '%';
 
+        // ── Slider row (hidden by default, expands on pct click)
+        const sliderWrap = document.createElement('div');
+        sliderWrap.className = 'log-slider-wrap';
+
+        const slider = document.createElement('input');
+        slider.type  = 'range';
+        slider.min   = '0';
+        slider.max   = '100';
+        slider.step  = '10';
+        slider.value = String(val);
+        slider.style.accentColor = cat.color;
+        sliderWrap.appendChild(slider);
+
+        // ── Toggle click: binary 0 ↔ 100
+        toggle.addEventListener('click', () => {
+          const current = popupData[dateKey]?.[cat.id] ?? 0;
+          const newVal = current > 0 ? 0 : 100;
+          toggle.classList.toggle('checked', newVal > 0);
+          pct.textContent = newVal + '%';
+          slider.value = String(newVal);
+          saveAndUpdateCell(dateKey, cat.id, newVal);
+        });
+
+        // ── Pct click: expand/collapse slider
+        pct.addEventListener('click', e => {
+          e.stopPropagation();
+          const open = sliderWrap.classList.toggle('open');
+          pct.classList.toggle('open', open);
+        });
+
+        // ── Slider input: fine-tune percentage
         slider.addEventListener('input', () => {
           const v = parseInt(slider.value);
           pct.textContent = v + '%';
-          if (!popupData[dateKey]) popupData[dateKey] = {};
-          popupData[dateKey][cat.id] = v;
-          saveData(popupYear, popupData);
-          // Update the cell's intensity class in the DOM immediately
-          const cell = document.querySelector(`.cell[data-date="${dateKey}"]`);
-          if (cell) {
-            const lv  = dayLevel(popupData, dateKey);
-            const tod = isToday(new Date(dateKey + 'T12:00:00')) ? ' is-today' : '';
-            cell.className = `cell lv${lv}${tod}`;
-          }
+          toggle.classList.toggle('checked', v > 0);
+          saveAndUpdateCell(dateKey, cat.id, v);
         });
 
+        row.appendChild(toggle);
         row.appendChild(dot);
         row.appendChild(name);
-        row.appendChild(slider);
         row.appendChild(pct);
         logHabits.appendChild(row);
+        logHabits.appendChild(sliderWrap);
       });
 
-      // Show then position (needs dimensions to be measurable)
-      logPopup.style.opacity = '0';
-      logPopup.removeAttribute('hidden');
-      requestAnimationFrame(() => {
-        positionPopup(cellEl);
-        logPopup.style.opacity = '1';
-      });
+      // Show and position synchronously.
+      // offsetWidth/offsetHeight access inside positionPopup forces layout,
+      // so coordinates are correct without needing requestAnimationFrame.
+      logPopup.style.display = 'flex';
+      positionPopup(cellEl);
     }
 
     function positionPopup(cellEl) {
@@ -1538,9 +1622,17 @@
     }
 
     function closePopup() {
-      logPopup.setAttribute('hidden', '');
+      logPopup.style.display = 'none';
+      logPopup.style.opacity = '';
       popupDateKey = null;
-      renderYear(); // refresh stats bar after any data changes
+      // Defer re-render so it runs outside the current event cycle.
+      // This prevents any throw inside the render from propagating
+      // back through the click event and leaving the popup in a broken state.
+      setTimeout(() => {
+        if (viewMode === 'month') renderMonth();
+        else if (viewMode === 'week') renderWeek();
+        else renderYear();
+      }, 0);
     }
 
     // ── Tooltip ───────────────────────────────────────────────
@@ -1673,6 +1765,7 @@
         cfg.categories = DEFAULT_CATEGORIES.map(c => ({ ...c, id: uid() }));
       }
       saveCfg();
+      activeFilters = new Set(cfg.categories.map(c => c.id));
       closeSettings();
       renderYear();
     }
@@ -1697,14 +1790,24 @@
 
     // Click outside popup → close
     document.addEventListener('click', e => {
-      if (!logPopup.hasAttribute('hidden') &&
+      if (logPopup.style.display === 'flex' &&
           !logPopup.contains(e.target) &&
           !e.target.closest('.cell:not(.is-empty)')) {
         closePopup();
       }
     });
 
-    document.getElementById('logClose').addEventListener('click', closePopup);
+    document.getElementById('logClose').addEventListener('click', e => {
+      e.stopPropagation();
+      closePopup();
+    });
+
+    // Settings shortcut from inside the popup
+    document.getElementById('logManage').addEventListener('click', e => {
+      e.stopPropagation();
+      closePopup();
+      openSettings();
+    });
 
     // Tooltip on hover (event delegation)
     document.getElementById('root').addEventListener('mouseover', e => {

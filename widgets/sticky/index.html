@@ -248,8 +248,13 @@
         tab.title = note.title;
         tab.dataset.id = note.id;
 
-        tab.addEventListener('click', () => switchTab(note.id));
-        tab.addEventListener('dblclick', e => { e.stopPropagation(); startRename(tab, note); });
+        tab.addEventListener('click', () => {
+          if (note.id === store.activeId) {
+            startRename(tab, note);
+          } else {
+            switchTab(note.id);
+          }
+        });
         tab.addEventListener('contextmenu', e => {
           e.preventDefault();
           if (store.notes.length <= 1) return;
