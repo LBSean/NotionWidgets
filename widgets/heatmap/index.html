@@ -8,835 +8,482 @@
   <script src="../../shared/theme.js"></script>
 
   <style>
+    /* ── Layout ─────────────────────────────────── */
     body {
-      --cell: 13px;
       color: var(--color-text);
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      justify-content: center;
       min-height: 100%;
-      padding: 0.9rem 1rem 0.75rem;
-      gap: 0.5rem;
+      padding: 0.6rem 0.8rem 0.5rem;
+      gap: 0.35rem;
+      user-select: none;
+      position: relative;
+      overflow: hidden;
     }
 
-    /* ── Header row ───────────────────────────────────────────── */
-    .hm-head {
+    /* ── Header ─────────────────────────────────── */
+    .hm-header {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       justify-content: space-between;
-      width: 100%;
+      flex-wrap: wrap;
+      gap: 0.3rem;
     }
-
     .hm-title {
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--color-text-muted);
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      letter-spacing: 0.02em;
     }
-
-    .hm-stats {
-      font-size: 0.7rem;
-      color: var(--color-text-muted);
+    .hm-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
     }
-
-    .hm-stats strong {
-      color: var(--color-text);
-    }
-
-    /* ── Year nav ─────────────────────────────────────────────── */
     .hm-nav {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      font-size: 0.72rem;
-      font-weight: 600;
-      color: var(--color-text-muted);
+      gap: 0.15rem;
     }
-
     .hm-nav button {
       background: none;
       border: none;
       cursor: pointer;
-      padding: 0 0.2rem;
-      font-size: 0.8rem;
       color: var(--color-text-muted);
+      font-size: 0.9rem;
+      padding: 0 4px;
       line-height: 1;
       border-radius: 3px;
-      transition: color 0.15s;
     }
     .hm-nav button:hover { color: var(--color-text); }
+    .hm-nav-label {
+      font-size: 0.7rem;
+      font-weight: 500;
+      min-width: 2.5em;
+      text-align: center;
+    }
+    .hm-views {
+      display: flex;
+      gap: 1px;
+    }
+    .hm-views button {
+      background: none;
+      border: 1px solid var(--color-border);
+      cursor: pointer;
+      color: var(--color-text-muted);
+      font-size: 0.6rem;
+      padding: 2px 8px;
+      line-height: 1.2;
+    }
+    .hm-views button:first-child { border-radius: 4px 0 0 4px; }
+    .hm-views button:last-child { border-radius: 0 4px 4px 0; }
+    .hm-views button.active {
+      background: var(--color-accent);
+      color: #fff;
+      border-color: var(--color-accent);
+    }
 
-    /* ── Chart wrapper ────────────────────────────────────────── */
-    .hm-outer {
-      width: 100%;
+    /* ── Stats bar ──────────────────────────────── */
+    .hm-stats {
+      display: flex;
+      gap: 0.8rem;
+      font-size: 0.62rem;
+      color: var(--color-text-muted);
+    }
+    .hm-stat-val {
+      font-weight: 700;
+      color: var(--color-text);
+    }
+
+    /* ── Year view ──────────────────────────────── */
+    .hm-year-scroll {
       overflow-x: auto;
       overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
     }
-
-    .hm-chart {
+    .hm-year {
       display: flex;
-      flex-direction: row;
       gap: 0;
-      user-select: none;
     }
-
-    /* Day labels column */
     .hm-day-labels {
       display: flex;
       flex-direction: column;
-      padding-top: 18px;
+      gap: 1px;
+      padding-top: 16px;
       margin-right: 4px;
       flex-shrink: 0;
     }
-
     .hm-day-label {
-      font-size: 0.6rem;
+      font-size: 0.48rem;
       color: var(--color-text-muted);
-      line-height: 1;
-      height: var(--cell);
-      display: flex;
-      align-items: center;
+      height: 11px;
+      line-height: 11px;
+      width: 20px;
+      text-align: right;
+      padding-right: 3px;
     }
-
-    /* Month columns */
-    .hm-months-row {
+    .hm-year-cols {
       display: flex;
-      flex-direction: row;
-      gap: 6px;
+      gap: 2px;
     }
-
-    .hm-month {
+    .hm-week-col {
       display: flex;
       flex-direction: column;
-      gap: 2px;
-      flex-shrink: 0;
+      gap: 1px;
     }
-
     .hm-month-label {
-      font-size: 0.6rem;
-      font-weight: 600;
+      font-size: 0.48rem;
       color: var(--color-text-muted);
-      height: 18px;
-      line-height: 18px;
+      height: 14px;
+      line-height: 14px;
+      text-align: left;
+      cursor: pointer;
       white-space: nowrap;
     }
+    .hm-month-label:hover { color: var(--color-text); }
+    .hm-month-label:empty { cursor: default; }
 
-    .hm-month-weeks {
-      display: flex;
-      flex-direction: row;
-      gap: 2px;
-    }
-
-    .hm-week {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      flex-shrink: 0;
-    }
-
+    /* ── Cells (shared) ─────────────────────────── */
     .cell {
-      width:  var(--cell);
-      height: var(--cell);
+      width: 11px;
+      height: 11px;
       border-radius: 2px;
-      background: #ebedf0;
       cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
+      transition: transform 0.08s;
+    }
+    .cell:hover { transform: scale(1.4); z-index: 2; }
+    .cell.empty { visibility: hidden; cursor: default; }
+    .cell.today { outline: 2px solid var(--color-accent); outline-offset: -1px; }
+    .cell.future { opacity: 0.35; }
+
+    /* Intensity levels — light */
+    .lv0 { background: #ebedf0; }
+    .lv1 { background: #9be9a8; }
+    .lv2 { background: #40c463; }
+    .lv3 { background: #30a14e; }
+    .lv4 { background: #216e39; }
+    /* Intensity levels — dark */
+    html[data-theme="dark"] .lv0 { background: #21262d; }
+    html[data-theme="dark"] .lv1 { background: #0e4429; }
+    html[data-theme="dark"] .lv2 { background: #006d32; }
+    html[data-theme="dark"] .lv3 { background: #26a641; }
+    html[data-theme="dark"] .lv4 { background: #39d353; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme]) .lv0 { background: #21262d; }
+      :root:not([data-theme]) .lv1 { background: #0e4429; }
+      :root:not([data-theme]) .lv2 { background: #006d32; }
+      :root:not([data-theme]) .lv3 { background: #26a641; }
+      :root:not([data-theme]) .lv4 { background: #39d353; }
+    }
+
+    /* ── Month view ─────────────────────────────── */
+    .hm-month-view { padding: 0.2rem 0; }
+    .hm-month-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+    }
+    .hm-month-day-header {
+      font-size: 0.5rem;
+      color: var(--color-text-muted);
+      text-align: center;
+      padding-bottom: 2px;
+    }
+    .month-cell {
+      aspect-ratio: 1;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.58rem;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: transform 0.08s;
+      position: relative;
+    }
+    .month-cell:hover { transform: scale(1.08); z-index: 2; }
+    .month-cell.empty { visibility: hidden; cursor: default; }
+    .month-cell.today { outline: 2px solid var(--color-accent); outline-offset: -1px; }
+    .month-cell.future { opacity: 0.35; }
+    .day-num { position: relative; z-index: 1; font-weight: 500; }
+    .month-cell.lv1 .day-num,
+    .month-cell.lv2 .day-num,
+    .month-cell.lv3 .day-num,
+    .month-cell.lv4 .day-num { color: #fff; }
+
+    /* ── Week view ──────────────────────────────── */
+    .hm-week-view { display: flex; flex-direction: column; gap: 0; }
+    .week-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid var(--color-border);
+      cursor: pointer;
+    }
+    .week-row:hover { background: var(--color-surface); }
+    .week-row.today-row { background: var(--color-surface); }
+    .week-day-name {
+      font-size: 0.68rem;
+      font-weight: 600;
+      width: 28px;
+      flex-shrink: 0;
+      color: var(--color-text-muted);
+    }
+    .week-date {
+      font-size: 0.58rem;
+      color: var(--color-text-muted);
+      width: 42px;
       flex-shrink: 0;
     }
-
-    @media (prefers-color-scheme: dark) {
-      .cell { background: #21262d; }
+    .week-bar {
+      flex: 1;
+      height: 7px;
+      background: var(--color-border);
+      border-radius: 4px;
+      overflow: hidden;
     }
-
-    .cell:hover { transform: scale(1.3); z-index: 1; position: relative; }
-
-    .cell.is-today {
-      outline: 1.5px solid #888;
-      outline-offset: 1px;
+    .week-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.15s;
     }
-
-    .cell.is-empty {
-      background: transparent;
-      cursor: default;
-      pointer-events: none;
+    .week-chips {
+      display: flex;
+      gap: 3px;
+      flex-wrap: wrap;
     }
-
-    /* ── Intensity levels ─────────────────────────────────────── */
-    .cell.lv0 { background: #ebedf0; }
-    .cell.lv1 { background: #9be9a8; }
-    .cell.lv2 { background: #40c463; }
-    .cell.lv3 { background: #30a14e; }
-    .cell.lv4 { background: #216e39; }
-
-    .legend-cell.lv0 { background: #ebedf0; }
-    .legend-cell.lv1 { background: #9be9a8; }
-    .legend-cell.lv2 { background: #40c463; }
-    .legend-cell.lv3 { background: #30a14e; }
-    .legend-cell.lv4 { background: #216e39; }
-
-    @media (prefers-color-scheme: dark) {
-      .cell.lv0 { background: #21262d; }
-      .cell.lv1 { background: #0e4429; }
-      .cell.lv2 { background: #006d32; }
-      .cell.lv3 { background: #26a641; }
-      .cell.lv4 { background: #39d353; }
-      .legend-cell.lv0 { background: #21262d; }
-      .legend-cell.lv1 { background: #0e4429; }
-      .legend-cell.lv2 { background: #006d32; }
-      .legend-cell.lv3 { background: #26a641; }
-      .legend-cell.lv4 { background: #39d353; }
+    .week-chip {
+      font-size: 0.5rem;
+      padding: 1px 5px;
+      border-radius: 3px;
+      border: 1px solid var(--color-border);
     }
+    .week-chip.done { color: #fff; }
 
-    /* ── Filter chips ────────────────────────────────────────── */
+    /* ── Filter chips ───────────────────────────── */
     .hm-filters {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-top: 0.6rem;
-      padding: 0.4rem 0;
+      gap: 4px;
+      padding: 0.25rem 0;
     }
-
     .filter-chip {
-      display: inline-flex;
+      display: flex;
       align-items: center;
-      gap: 0.3rem;
-      padding: 0.35rem 0.6rem;
+      gap: 3px;
+      font-size: 0.55rem;
+      padding: 2px 7px;
+      border-radius: 10px;
       border: 1px solid var(--color-border);
-      border-radius: 12px;
-      background: transparent;
-      color: var(--color-text);
-      font-size: 0.65rem;
       cursor: pointer;
-      transition: all 0.2s;
+      background: none;
+      color: var(--color-text-muted);
+      transition: all 0.12s;
     }
-
-    .filter-chip:hover {
-      border-color: var(--filter-color);
-      background: var(--filter-color);
-      background: color-mix(in srgb, var(--filter-color) 10%, transparent);
-    }
-
-    .filter-chip.active {
-      background: var(--filter-color);
-      color: #fff;
-      border-color: var(--filter-color);
-    }
-
+    .filter-chip.active { color: #fff; }
     .filter-dot {
       width: 6px;
       height: 6px;
-      border-radius: 50%;;
-      background: var(--filter-color);
+      border-radius: 50%;
+      flex-shrink: 0;
     }
 
-    .filter-chip.active .filter-dot {
-      background: #fff;
-    }
-
-    html[data-theme="dark"] .filter-chip:hover {
-      background: color-mix(in srgb, var(--filter-color) 20%, transparent);
-    }
-
-    /* ── Analytics panel ──────────────────────────────────────── */
-    .hm-analytics {
-      background: var(--color-bg);
-      border: 1px solid var(--color-border);
-      border-radius: 6px;
-      padding: 0.8rem;
-      margin: 0.6rem 0;
-      font-size: 0.65rem;
-    }
-
-    .analytics-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.8rem;
-      margin-bottom: 0.8rem;
-    }
-
-    .analytics-item {
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
-    }
-
-    .analytics-label {
-      color: var(--color-text-muted);
-      font-size: 0.6rem;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
-
-    .analytics-value {
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--color-text);
-    }
-
-    .analytics-bars {
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
-      padding-top: 0.6rem;
-      border-top: 1px solid var(--color-border);
-    }
-
-    .analytics-bar {
-      display: grid;
-      grid-template-columns: 60px 1fr 32px;
-      gap: 0.5rem;
-      align-items: center;
-      font-size: 0.6rem;
-    }
-
-    .analytics-bar-bg {
-      height: 6px;
-      background: var(--color-border);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-
-    .analytics-bar-fill {
-      height: 100%;
-      border-radius: 2px;
-      transition: width 0.3s;
-    }
-
-    .analytics-pct {
-      text-align: right;
-      color: var(--color-text-muted);
-      font-weight: 500;
-    }
-
-    /* ── Legend ──────────────────────────────────────────────── */
+    /* ── Legend ──────────────────────────────────── */
     .hm-legend {
       display: flex;
       align-items: center;
-      gap: 0.3rem;
-      font-size: 0.62rem;
+      gap: 3px;
+      font-size: 0.5rem;
       color: var(--color-text-muted);
-      margin-top: 0.2rem;
     }
-
     .legend-cell {
       width: 10px;
       height: 10px;
       border-radius: 2px;
     }
 
-    @media (prefers-color-scheme: dark) {
-      .legend-cell.lv0 { background: #21262d; }
-    }
-
-    html[data-theme="dark"]  .cell.lv0 { background: #21262d; }
-    html[data-theme="dark"]  .cell.lv1 { background: #0e4429; }
-    html[data-theme="dark"]  .cell.lv2 { background: #006d32; }
-    html[data-theme="dark"]  .cell.lv3 { background: #26a641; }
-    html[data-theme="dark"]  .cell.lv4 { background: #39d353; }
-    html[data-theme="light"] .cell.lv0 { background: #ebedf0; }
-    html[data-theme="light"] .cell.lv1 { background: #9be9a8; }
-    html[data-theme="light"] .cell.lv2 { background: #40c463; }
-    html[data-theme="light"] .cell.lv3 { background: #30a14e; }
-    html[data-theme="light"] .cell.lv4 { background: #216e39; }
-    html[data-theme="dark"]  .legend-cell.lv0 { background: #21262d; }
-    html[data-theme="dark"]  .legend-cell.lv1 { background: #0e4429; }
-    html[data-theme="dark"]  .legend-cell.lv2 { background: #006d32; }
-    html[data-theme="dark"]  .legend-cell.lv3 { background: #26a641; }
-    html[data-theme="dark"]  .legend-cell.lv4 { background: #39d353; }
-    html[data-theme="light"] .legend-cell.lv0 { background: #ebedf0; }
-    html[data-theme="light"] .legend-cell.lv1 { background: #9be9a8; }
-    html[data-theme="light"] .legend-cell.lv2 { background: #40c463; }
-    html[data-theme="light"] .legend-cell.lv3 { background: #30a14e; }
-    html[data-theme="light"] .legend-cell.lv4 { background: #216e39; }
-
-    /* ── Settings panel ───────────────────────────────────────── */
-    .settings {
+    /* ── Tooltip ─────────────────────────────────── */
+    .hm-tooltip {
       position: fixed;
-      inset: 0;
-      background: #fff;
-      transform: translateY(100%);
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      z-index: 10;
-      overflow-y: auto;
-      padding: 1.2rem 1.4rem 2rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-    .settings.open { transform: translateY(0); }
-
-    html[data-theme="dark"]  .settings { background: #191a1f; color: #e0e0e8; }
-    html[data-theme="light"] .settings { background: #fff; }
-
-    .settings__head {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex-shrink: 0;
-    }
-    .settings__head h2 { font-size: 0.95rem; font-weight: 700; }
-
-    .settings__section-title {
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--color-text-muted);
-      margin-bottom: 0.5rem;
-    }
-
-    /* Category list */
-    .cat-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .cat-row {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .cat-color {
-      width: 26px;
-      height: 26px;
-      border-radius: 6px;
-      border: 1.5px solid var(--color-border);
-      cursor: pointer;
-      padding: 0;
-      flex-shrink: 0;
-      appearance: none;
-      -webkit-appearance: none;
-      background: none;
-    }
-    .cat-color::-webkit-color-swatch-wrapper { padding: 2px; }
-    .cat-color::-webkit-color-swatch { border: none; border-radius: 4px; }
-
-    .cat-name {
-      flex: 1;
-      padding: 0.3rem 0.5rem;
-      border: 1.5px solid var(--color-border);
-      border-radius: 6px;
-      font-size: 0.82rem;
-      font-family: inherit;
-      background: transparent;
-      color: var(--color-text);
-      outline: none;
-      transition: border-color 0.15s;
-    }
-    .cat-name:focus { border-color: var(--color-accent); }
-
-    html[data-theme="dark"] .cat-name { color: #e0e0e8; }
-
-    .cat-del {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--color-text-muted);
-      font-size: 1rem;
-      padding: 2px 4px;
-      border-radius: 4px;
-      line-height: 1;
-      transition: color 0.15s;
-      flex-shrink: 0;
-    }
-    .cat-del:hover { color: #ef4444; }
-
-    .btn-add-cat {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-      background: none;
-      border: 1.5px dashed var(--color-border);
-      border-radius: 6px;
-      padding: 0.35rem 0.6rem;
-      font-size: 0.78rem;
-      color: var(--color-text-muted);
-      cursor: pointer;
-      transition: border-color 0.15s, color 0.15s;
-      align-self: flex-start;
-    }
-    .btn-add-cat:hover { border-color: var(--color-accent); color: var(--color-accent); }
-
-    .settings__actions {
-      display: flex;
-      gap: 0.75rem;
-      align-items: center;
-      margin-top: auto;
-      padding-top: 0.5rem;
-    }
-
-    .btn-save {
-      padding: 0.45em 1.2em;
-      background: var(--color-accent);
-      color: #fff;
-      border: none;
-      border-radius: 7px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn-save:hover { opacity: 0.88; }
-
-    .btn-cancel-settings {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--color-text-muted);
-      font-size: 0.82rem;
-    }
-    .btn-cancel-settings:hover { color: var(--color-text); }
-
-    /* Back/icon buttons */
-    .btn-icon {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--color-text-muted);
-      font-size: 1rem;
-      padding: 2px 5px;
-      border-radius: 4px;
-      line-height: 1;
-      transition: color 0.15s;
-    }
-    .btn-icon:hover { color: var(--color-text); }
-
-    /* ── Log popup ────────────────────────────────────────────── */
-    .log-popup {
-      position: fixed;
-      z-index: 20;
-      background: #fff;
-      border-radius: 10px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.18);
-      padding: 0.8rem 1rem;
-      min-width: 230px;
-      max-width: 300px;
-      flex-direction: column;
-      gap: 0.35rem;
-      transition: opacity 0.1s;
-    }
-
-    @media (prefers-color-scheme: dark) { .log-popup { background: #2a2b33; } }
-    html[data-theme="dark"]  .log-popup { background: #2a2b33; }
-    html[data-theme="light"] .log-popup { background: #fff; }
-
-    .log-date {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: var(--color-text);
-      padding-bottom: 0.3rem;
-      border-bottom: 1px solid var(--color-border);
-    }
-
-    .log-row {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.2rem 0;
-    }
-
-    .log-toggle {
-      width: 18px;
-      height: 18px;
-      border-radius: 4px;
-      border: 2px solid var(--toggle-color);
-      background: transparent;
-      cursor: pointer;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      line-height: 1;
-      color: transparent;
-      transition: background 0.15s, color 0.15s;
-      padding: 0;
-    }
-    .log-toggle.checked {
-      background: var(--toggle-color);
-      color: #fff;
-    }
-
-    .log-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    .log-name {
-      font-size: 0.68rem;
-      color: var(--color-text);
-      flex: 1;
+      z-index: 30;
+      background: #24292f;
+      color: #e6edf3;
+      font-size: 0.58rem;
+      padding: 5px 8px;
+      border-radius: 5px;
+      pointer-events: none;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      opacity: 0;
+      transition: opacity 0.08s;
+      line-height: 1.4;
     }
+    .hm-tooltip.visible { opacity: 1; }
+    html[data-theme="light"] .hm-tooltip { background: #24292f; color: #e6edf3; }
 
-    .log-pct {
-      font-size: 0.62rem;
+    /* ── Log dialog (native <dialog>) ────────────── */
+    dialog {
+      border: none;
+      border-radius: 10px;
+      padding: 0;
+      background: #fff;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      max-width: 280px;
+      width: calc(100% - 2rem);
+    }
+    dialog::backdrop { background: rgba(0,0,0,0.25); }
+    html[data-theme="dark"] dialog { background: #2a2b33; color: var(--color-text); }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme]) dialog { background: #2a2b33; color: #e8e8e6; }
+    }
+    .dlg-inner {
+      padding: 0.9rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+    .dlg-date {
+      font-size: 0.78rem;
       font-weight: 600;
-      color: var(--color-text-muted);
-      flex-shrink: 0;
-      cursor: pointer;
-      border-radius: 3px;
-      padding: 0.15rem 0.35rem;
-      transition: background 0.15s;
-      min-width: 32px;
-      text-align: center;
     }
-    .log-pct:hover { background: var(--color-border); }
-    .log-pct.open  { background: var(--color-border); }
-
-    .log-slider-wrap {
-      display: none;
-      padding: 0 0 0.3rem 26px;
-    }
-    .log-slider-wrap.open {
+    .dlg-row {
       display: flex;
       align-items: center;
       gap: 0.4rem;
     }
-    .log-slider-wrap input[type="range"] {
-      flex: 1;
-      cursor: pointer;
-      min-width: 0;
+    .dlg-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
     }
+    .dlg-name {
+      font-size: 0.68rem;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .dlg-slider {
+      width: 72px;
+      height: 4px;
+      cursor: pointer;
+    }
+    .dlg-pct {
+      font-size: 0.6rem;
+      width: 28px;
+      text-align: right;
+      color: var(--color-text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .dlg-done {
+      margin-top: 0.25rem;
+      padding: 0.32rem;
+      border: none;
+      border-radius: 6px;
+      background: var(--color-accent);
+      color: #fff;
+      font-size: 0.68rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .dlg-done:hover { opacity: 0.85; }
 
-    .log-footer {
+    /* ── Settings panel (slide-up, matches weather/news) ── */
+    .settings {
+      position: absolute;
+      inset: 0;
+      background: #fff;
+      transform: translateY(100%);
+      transition: transform 0.25s ease;
+      z-index: 10;
+      overflow-y: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+    }
+    .settings.open { transform: translateY(0); }
+    html[data-theme="dark"] .settings { background: #191a1f; }
+    html[data-theme="light"] .settings { background: #fff; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme]) .settings { background: #191a1f; }
+    }
+    .settings h2 {
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .cat-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .cat-row {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      margin-top: 0.2rem;
-      padding-top: 0.3rem;
-      border-top: 1px solid var(--color-border);
+      gap: 0.4rem;
     }
-
-    .log-manage {
+    .cat-row input[type="text"] {
+      flex: 1;
+      font-size: 0.7rem;
+      padding: 4px 8px;
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--color-text);
+    }
+    .cat-row input[type="color"] {
+      width: 26px;
+      height: 26px;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+      padding: 0;
+    }
+    .cat-del {
       background: none;
       border: none;
       cursor: pointer;
-      font-size: 0.62rem;
-      color: var(--color-text-muted);
-      padding: 0.2em 0;
-      transition: color 0.15s;
+      color: #e74c3c;
+      font-size: 0.8rem;
+      padding: 2px 4px;
+      line-height: 1;
     }
-    .log-manage:hover { color: var(--color-text); }
-
-    .log-close {
-      padding: 0.28em 0.8em;
-      background: var(--color-accent);
-      color: #fff;
+    .cat-del:hover { opacity: 0.6; }
+    .settings-btn {
+      padding: 0.35rem 0.75rem;
       border: none;
       border-radius: 6px;
-      font-size: 0.72rem;
-      font-weight: 600;
+      font-size: 0.68rem;
       cursor: pointer;
+      font-weight: 500;
     }
-    .log-close:hover { opacity: 0.88; }
-
-    /* ── Tooltip ──────────────────────────────────────────────── */
-    .hm-tooltip {
-      position: fixed;
-      z-index: 15;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.12);
-      padding: 0.5rem 0.75rem;
-      font-size: 0.7rem;
-      pointer-events: none;
-      display: none;
-    }
-
-    .hm-tooltip[visible] { display: block; }
-
-    @media (prefers-color-scheme: dark) { .hm-tooltip { background: #2a2b33; } }
-    html[data-theme="dark"]  .hm-tooltip { background: #2a2b33; }
-    html[data-theme="light"] .hm-tooltip { background: #fff; }
-
-    .tt-date {
-      font-weight: 700;
-      color: var(--color-text);
-      margin-bottom: 0.3rem;
-      padding-bottom: 0.3rem;
-      border-bottom: 1px solid var(--color-border);
-    }
-
-    .tt-items {
+    .settings-btn.primary { background: var(--color-accent); color: #fff; }
+    .settings-btn.primary:hover { opacity: 0.85; }
+    .settings-btn.secondary { background: var(--color-border); color: var(--color-text); }
+    .settings-btn.secondary:hover { opacity: 0.75; }
+    .settings-actions {
       display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
+      gap: 0.4rem;
+      margin-top: 0.3rem;
     }
 
-    .tt-item {
-      color: var(--color-text);
-    }
-
-    .tt-empty {
-      color: var(--color-text-muted);
-      font-style: italic;
-    }
-
-    /* ── View toggle ──────────────────────────────────────────── */
-    .hm-view-toggle {
+    /* ── Bottom bar (filters + legend row) ───────── */
+    .hm-bottom {
       display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
       gap: 0.3rem;
-      margin-left: auto;
     }
-
-    .hm-view-btn {
-      padding: 0.25em 0.6em;
-      font-size: 0.72rem;
-      font-weight: 600;
-      background: transparent;
-      border: 1.5px solid var(--color-border);
-      border-radius: 5px;
-      color: var(--color-text-muted);
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .hm-view-btn.active {
-      background: var(--color-accent);
-      color: #fff;
-      border-color: var(--color-accent);
-    }
-
-    .hm-view-btn:hover:not(.active) { border-color: var(--color-accent); }
-
-    /* ── Month view ───────────────────────────────────────────── */
-    .month-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 3px;
-      justify-items: center;
-    }
-
-    .month-row-label {
-      grid-column: 1 / -1;
-      font-size: 0.65rem;
-      font-weight: 600;
-      color: var(--color-text-muted);
-      text-align: left;
-      margin-bottom: 0.2rem;
-    }
-
-    .month-cell {
-      width: 28px;
-      height: 28px;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.6rem;
-      color: var(--color-text-muted);
-      cursor: pointer;
-      position: relative;
-      flex-shrink: 0;
-    }
-
-    .month-cell .day-num {
-      position: relative;
-      z-index: 1;
-    }
-
-    .month-cell .mini-bar {
-      position: absolute;
-      bottom: 2px;
-      left: 3px;
-      right: 3px;
-      height: 3px;
-      border-radius: 1px;
-      display: flex;
-      gap: 1px;
-      overflow: hidden;
-    }
-
-    .mini-bar-seg {
-      height: 100%;
-      border-radius: 1px;
-      flex: 1;
-    }
-
-    /* ── Week view ────────────────────────────────────────────── */
-    .week-container {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-    }
-
-    .week-row {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.4rem 0;
-      border-bottom: 1px solid var(--color-border);
-    }
-
-    .week-day {
-      font-size: 0.72rem;
-      font-weight: 600;
-      width: 32px;
-      color: var(--color-text-muted);
-      flex-shrink: 0;
-    }
-
-    .week-date {
-      font-size: 0.65rem;
-      color: var(--color-text-muted);
-      width: 48px;
-      flex-shrink: 0;
-    }
-
-    .week-bar {
-      flex: 1;
-      height: 8px;
-      background: var(--color-border);
-      border-radius: 4px;
-      overflow: hidden;
-      min-width: 40px;
-    }
-
-    .week-bar-fill {
-      height: 100%;
-      border-radius: 4px;
-      transition: width 0.2s;
-    }
-
-    .week-chips {
-      display: flex;
-      gap: 4px;
-      flex-shrink: 0;
-    }
-
-    .week-chip {
-      font-size: 0.6rem;
-      padding: 2px 6px;
-      border-radius: 4px;
-      border: 1px solid var(--color-border);
-      background: transparent;
-      color: var(--color-text-muted);
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .week-chip.done {
-      color: #fff;
-      border-color: var(--chip-color);
-      background: var(--chip-color);
-    }
-
-</style>
+  </style>
 </head>
 <body>
 
+  <!-- Widget control bar -->
   <div class="widget-bar">
-    <button class="btn-icon" id="gearBtn" title="Settings">⚙</button>
-    <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
+    <button id="gearBtn" title="Settings" aria-label="Settings">⚙</button>
+    <button class="theme-switch" onclick="__toggleTheme()" title="Toggle theme" aria-label="Toggle theme">
       <span class="theme-switch__icon">☀</span>
       <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
       <span class="theme-switch__icon">🌙</span>
@@ -846,1005 +493,479 @@
   <!-- Main content (rendered by JS) -->
   <div id="root"></div>
 
-  <!-- Settings panel -->
+  <!-- Settings panel (slides up from bottom) -->
   <div class="settings" id="settingsPanel">
-    <div class="settings__head">
-      <button class="btn-icon" id="settingsCloseBtn">←</button>
-      <h2>Habit Categories</h2>
-    </div>
-
-    <div>
-      <div class="settings__section-title">Categories</div>
-      <div class="cat-list" id="catList"></div>
-      <button class="btn-add-cat" id="addCatBtn" style="margin-top:0.5rem">+ Add Category</button>
-    </div>
-
-    <div class="settings__actions">
-      <button class="btn-save" id="saveSettingsBtn">Save</button>
-      <button class="btn-cancel-settings" id="cancelSettingsBtn">Cancel</button>
+    <h2>Categories</h2>
+    <div class="cat-list" id="catList"></div>
+    <button class="settings-btn secondary" id="addCatBtn">+ Add Category</button>
+    <div class="settings-actions">
+      <button class="settings-btn primary" id="saveSettingsBtn">Save</button>
+      <button class="settings-btn secondary" id="cancelSettingsBtn">Cancel</button>
     </div>
   </div>
 
-  <!-- Log popup -->
-  <div class="log-popup" id="logPopup" style="display:none">
-    <div class="log-date" id="logDate"></div>
-    <div class="log-habits" id="logHabits"></div>
-    <div class="log-footer">
-      <button class="log-manage" id="logManage" title="Manage categories">⚙ Categories</button>
-      <button class="log-close" id="logClose">Done</button>
+  <!-- Log dialog (native <dialog> — no CSS display hacks needed) -->
+  <dialog id="logDialog">
+    <div class="dlg-inner">
+      <div class="dlg-date" id="dlgDate"></div>
+      <div id="dlgHabits"></div>
+      <button class="dlg-done" id="dlgDone">Done</button>
     </div>
-  </div>
+  </dialog>
 
-  <!-- Tooltip -->
-  <div class="hm-tooltip" id="tooltip">
-    <div class="tt-date" id="tt-date"></div>
-    <div class="tt-items" id="tt-items"></div>
-  </div>
+  <!-- Hover tooltip -->
+  <div class="hm-tooltip" id="tooltip"></div>
 
   <script>
-    // ── Constants ─────────────────────────────────────────────
-    const CFG_KEY      = 'habits-cfg';
-    const OLD_KEY_PFX  = 'heatmap-';
-    const DATA_KEY_PFX = 'habits-';
+  (function () {
+    'use strict';
 
-    const DEFAULT_CATEGORIES = [
-      { id: uid(), name: 'Health',       color: '#39d353' },
-      { id: uid(), name: 'Productivity', color: '#3b82f6' },
-      { id: uid(), name: 'Learning',     color: '#f59e0b' },
-      { id: uid(), name: 'Social',       color: '#ec4899' },
+    // ─── Constants ──────────────────────────────────
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const MONTH_FULL = ['January','February','March','April','May','June',
+                        'July','August','September','October','November','December'];
+    const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const DEFAULT_CATS = [
+      { id: 'c_health', name: 'Health',       color: '#39d353' },
+      { id: 'c_prod',   name: 'Productivity', color: '#3b82f6' },
+      { id: 'c_learn',  name: 'Learning',     color: '#f59e0b' },
+      { id: 'c_social', name: 'Social',       color: '#ec4899' }
     ];
 
-    // ── Utilities ─────────────────────────────────────────────
-    function uid() {
-      return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    // ─── State ──────────────────────────────────────
+    let cfg, viewMode = 'year', viewYear = new Date().getFullYear();
+    let viewMonth = new Date().getMonth(), viewWeekStart = null;
+    let activeFilters = new Set();
+
+    // ─── DOM refs ───────────────────────────────────
+    const root          = document.getElementById('root');
+    const settingsPanel = document.getElementById('settingsPanel');
+    const logDialog     = document.getElementById('logDialog');
+    const tooltip       = document.getElementById('tooltip');
+
+    // ─── Data layer ─────────────────────────────────
+    const uid = () => 'c_' + Math.random().toString(36).slice(2, 9);
+
+    function loadCfg() {
+      try { const r = localStorage.getItem('habits-cfg'); if (r) return JSON.parse(r); } catch {}
+      return { categories: DEFAULT_CATS.map(c => ({ ...c })) };
+    }
+    function saveCfg(c) { localStorage.setItem('habits-cfg', JSON.stringify(c)); }
+
+    function loadData(year) {
+      try { const r = localStorage.getItem('habits-' + year); if (r) return JSON.parse(r); } catch {}
+      return {};
+    }
+    function saveData(year, d) { localStorage.setItem('habits-' + year, JSON.stringify(d)); }
+
+    function migrateOldData() {
+      for (let y = 2020; y <= 2035; y++) {
+        const raw = localStorage.getItem('heatmap-' + y);
+        if (!raw) continue;
+        try {
+          const old = JSON.parse(raw), catId = cfg.categories[0]?.id;
+          if (!catId) continue;
+          const cur = loadData(y);
+          for (const [k, v] of Object.entries(old)) {
+            if (v && !cur[k]) cur[k] = { [catId]: 100 };
+          }
+          saveData(y, cur);
+          localStorage.removeItem('heatmap-' + y);
+        } catch {}
+      }
     }
 
-    // ── Calendar helpers ───────────────────────────────────────
-    const MONTHS     = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const DAY_LABELS = ['Mon','','Wed','','Fri','','Sun'];
-
+    // ─── Helpers ────────────────────────────────────
     function iso(d) {
       return d.getFullYear() + '-' +
         String(d.getMonth() + 1).padStart(2, '0') + '-' +
         String(d.getDate()).padStart(2, '0');
     }
-
+    function parseDate(s) { return new Date(s + 'T12:00:00'); }
     function isToday(d) {
-      const t = new Date();
-      return d.getFullYear() === t.getFullYear() &&
-             d.getMonth()    === t.getMonth()    &&
-             d.getDate()     === t.getDate();
+      const n = new Date();
+      return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+    }
+    function isFuture(d) {
+      const n = new Date(); n.setHours(0,0,0,0);
+      const dd = new Date(d); dd.setHours(0,0,0,0);
+      return dd > n;
+    }
+    function getMondayOfWeek(d) {
+      const dt = new Date(d), dow = dt.getDay();
+      dt.setDate(dt.getDate() - ((dow + 6) % 7));
+      return dt;
     }
 
-    // Returns array of 7-element weeks (Mon–Sun) covering the full year.
-    // Days outside the year are null.
-    function buildWeeks(year) {
-      const weeks = [];
-      const jan1  = new Date(year, 0, 1);
-      const dow   = jan1.getDay();                // 0 = Sunday
-      const off   = dow === 0 ? -6 : 1 - dow;    // offset back to Monday
-      const cur   = new Date(year, 0, 1 + off);
-      const end   = new Date(year, 11, 31);
-
-      while (cur <= end) {
-        const week = [];
-        for (let i = 0; i < 7; i++) {
-          const day = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + i);
-          week.push(day.getFullYear() === year ? day : null);
-        }
-        weeks.push(week);
-        cur.setDate(cur.getDate() + 7);
-      }
-      return weeks;
-    }
-
-    // Groups weeks by the month of their first non-null day.
-    function groupWeeksByMonth(weeks) {
-      const groups = [];
-      let current  = null;
-      weeks.forEach(week => {
-        const first = week.find(d => d !== null);
-        if (!first) return;
-        const mi = first.getMonth();
-        if (!current || current.mi !== mi) {
-          current = { mi, name: MONTHS[mi], weeks: [] };
-          groups.push(current);
-        }
-        current.weeks.push(week);
-      });
-      return groups;
-    }
-
-    // ── Config (categories) ───────────────────────────────────
-    let cfg = { categories: [] };
-
-    function loadCfg() {
-      try {
-        const raw = localStorage.getItem(CFG_KEY);
-        if (raw) cfg = JSON.parse(raw);
-      } catch {}
-      if (!cfg.categories || !cfg.categories.length) {
-        cfg = { categories: DEFAULT_CATEGORIES.map(c => ({ ...c })) };
-        saveCfg();
-      }
-    }
-
-    function saveCfg() {
-      localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
-    }
-
-    function getCategoryColor(catId) {
-      const cat = cfg.categories.find(c => c.id === catId);
-      return cat ? cat.color : '#9ca3af';
-    }
-
-    // ── Habit data (per-year) ─────────────────────────────────
-    function loadData(year) {
-      try {
-        return JSON.parse(localStorage.getItem(DATA_KEY_PFX + year) || '{}');
-      } catch { return {}; }
-    }
-
-    function saveData(year, data) {
-      localStorage.setItem(DATA_KEY_PFX + year, JSON.stringify(data));
-    }
-
-    // ── Migration from old heatmap data ───────────────────────
-    function migrateOldData() {
-      const firstCatId = cfg.categories[0]?.id;
-      if (!firstCatId) return;
-
-      // Scan for heatmap-YYYY keys (years 2020–2030)
-      for (let y = 2020; y <= 2030; y++) {
-        const oldKey = OLD_KEY_PFX + y;
-        const oldRaw = localStorage.getItem(oldKey);
-        if (!oldRaw) continue;
-        try {
-          const activeDates = JSON.parse(oldRaw); // was array of ISO strings
-          if (!Array.isArray(activeDates) || !activeDates.length) {
-            localStorage.removeItem(oldKey);
-            continue;
-          }
-          const newData = loadData(y);
-          activeDates.forEach(dateStr => {
-            if (!newData[dateStr]) newData[dateStr] = {};
-            // Import as 100% on first category if not already set
-            if (newData[dateStr][firstCatId] === undefined) {
-              newData[dateStr][firstCatId] = 100;
-            }
-          });
-          saveData(y, newData);
-          localStorage.removeItem(oldKey);
-        } catch {
-          localStorage.removeItem(oldKey);
-        }
-      }
-    }
-
-    // ── Stats helpers ─────────────────────────────────────────
-    function countActiveDays(data) {
-      return Object.values(data).filter(day =>
-        day && typeof day === 'object' && Object.values(day).some(p => p > 0)
-      ).length;
-    }
-
-    // Consecutive days ending today with any activity
-    function calcStreak(data) {
-      let streak = 0;
-      const d = new Date();
-      d.setHours(0, 0, 0, 0);
-      while (true) {
-        const day = data[iso(d)];
-        if (!day || !Object.values(day).some(p => p > 0)) break;
-        streak++;
-        d.setDate(d.getDate() - 1);
-      }
-      return streak;
-    }
-
-    // % of days in a given month that have any activity
-    function calcMonthPct(data, year, month) {
-      const days = new Date(year, month + 1, 0).getDate();
-      let active = 0;
-      for (let d = 1; d <= days; d++) {
-        const key = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-        const day = data[key];
-        if (day && Object.values(day).some(p => p > 0)) active++;
-      }
-      return Math.round((active / days) * 100);
-    }
-
-    // Map a day's average category completion to intensity level 0–4
-    // Considers only active filter categories
-    function dayLevel(data, isoDate) {
-      const day = data[isoDate];
-      if (!day) return 0;
-      // Filter to only active categories
-      const vals = Object.entries(day)
-        .filter(([catId, v]) => activeFilters.has(catId) && typeof v === 'number')
-        .map(([_, v]) => v);
+    function getIntensity(dayData) {
+      if (!dayData || typeof dayData !== 'object') return 0;
+      const vals = cfg.categories
+        .filter(c => activeFilters.has(c.id) && dayData[c.id] > 0)
+        .map(c => dayData[c.id]);
       if (!vals.length) return 0;
-      const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
-      if (avg <= 0)  return 0;
+      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
       if (avg <= 25) return 1;
       if (avg <= 50) return 2;
       if (avg <= 75) return 3;
       return 4;
     }
 
-    // ── Analytics helpers ──────────────────────────────────────
-    function calcLongestStreak(data) {
-      let maxStreak = 0;
-      let currentStreak = 0;
-      const dates = Object.keys(data).sort();
-      let lastDate = null;
-      for (const dateStr of dates) {
-        const day = data[dateStr];
-        if (day && typeof day === 'object' && Object.values(day).some(p => p > 0)) {
-          if (!lastDate || isConsecutive(lastDate, dateStr)) {
-            currentStreak++;
-          } else {
-            maxStreak = Math.max(maxStreak, currentStreak);
-            currentStreak = 1;
-          }
-          lastDate = dateStr;
-        }
-      }
-      maxStreak = Math.max(maxStreak, currentStreak);
-      return maxStreak;
-    }
-
-    function isConsecutive(date1Str, date2Str) {
-      const d1 = new Date(date1Str + 'T12:00:00');
-      const d2 = new Date(date2Str + 'T12:00:00');
-      d1.setDate(d1.getDate() + 1);
-      return d1.toISOString().split('T')[0] === date2Str;
-    }
-
-    function mostConsistentDayOfWeek(data) {
-      const dayCount = [0, 0, 0, 0, 0, 0, 0];
-      for (const dateStr of Object.keys(data)) {
-        const day = data[dateStr];
-        if (day && typeof day === 'object' && Object.values(day).some(p => p > 0)) {
-          const d = new Date(dateStr + 'T12:00:00');
-          dayCount[d.getDay()]++;
-        }
-      }
-      const max = Math.max(...dayCount);
-      const dayIdx = dayCount.indexOf(max);
-      if (max === 0) return 'N/A';
-      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      return days[dayIdx] + 's';
-    }
-
-    function totalHabitsThisMonth(data, year, month) {
-      const days = new Date(year, month + 1, 0).getDate();
-      let total = 0;
-      for (let d = 1; d <= days; d++) {
-        const key = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-        const day = data[key];
-        if (day) {
-          total += Object.values(day).filter(v => v > 0).length;
-        }
-      }
-      return total;
-    }
-
-    function categoryCompletionThisMonth(data, year, month, catId) {
-      const days = new Date(year, month + 1, 0).getDate();
-      let completed = 0;
-      for (let d = 1; d <= days; d++) {
-        const key = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-        const day = data[key];
-        if (day && day[catId]) completed += day[catId];
-      }
-      return Math.round(completed / (days * 100) * 100);
-    }
-
-    // ── Year view ─────────────────────────────────────────────
-    let viewYear = new Date().getFullYear();
-
-    function renderYear() {
-      const today  = new Date();
-      const data   = loadData(viewYear);
-      const weeks  = buildWeeks(viewYear);
-      const groups = groupWeeksByMonth(weeks);
-
-      const activeDays = countActiveDays(data);
-      const streak     = calcStreak(data);
-      const monthPct   = (viewYear === today.getFullYear())
-        ? calcMonthPct(data, viewYear, today.getMonth())
-        : null;
-
-      // Day-of-week labels column
-      const dayLabelsHTML = DAY_LABELS.map(l =>
-        `<div class="hm-day-label">${l}</div>`
-      ).join('');
-
-      // Month columns
-      const monthsHTML = groups.map(group => {
-        const weeksHTML = group.weeks.map(week => {
-          const cellsHTML = week.map(d => {
-            if (!d || d.getMonth() !== group.mi) return `<div class="cell is-empty"></div>`;
-            const key = iso(d);
-            const lv  = dayLevel(data, key);
-            const cls = `cell lv${lv}${isToday(d) ? ' is-today' : ''}`;
-            // Build aria-label showing date and category breakdown
-            const dayData = data[key] || {};
-            const breakdown = cfg.categories
-              .filter(cat => activeFilters.has(cat.id))
-              .map(cat => `${cat.name} ${dayData[cat.id] ?? 0}%`)
-              .join(', ');
-            const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-            const ariaLabel = breakdown ? `${dateStr}: ${breakdown}` : `${dateStr}: No activity`;
-            return `<div class="${cls}" data-date="${key}" tabindex="0" aria-label="${ariaLabel}"></div>`;
-          }).join('');
-          return `<div class="hm-week">${cellsHTML}</div>`;
-        }).join('');
-        return `
-          <div class="hm-month">
-            <div class="hm-month-label" data-month="${group.mi}" style="cursor:pointer; transition:color 0.15s;" title="Click to view month">${group.name}</div>
-            <div class="hm-month-weeks">${weeksHTML}</div>
-          </div>`;
-      }).join('');
-
-      // Stats bar
-      const statsItems = [
-        `<strong>${activeDays}</strong> active`,
-        streak > 0 ? `<strong>${streak}</strong>d streak` : 'no streak',
-        monthPct !== null ? `<strong>${monthPct}%</strong> this month` : null,
-      ].filter(Boolean).join(' · ');
-
-      // Filter chips
-      const filterChipsHTML = cfg.categories.map(cat => {
-        const active = activeFilters.has(cat.id) ? ' active' : '';
-        return `<button class="filter-chip${active}" data-cat="${cat.id}" style="--filter-color:${cat.color};" title="Filter by ${cat.name}"><span class="filter-dot"></span>${cat.name}</button>`;
-      }).join('');
-
-      // Analytics panel (year view only)
-      const longestStreak = calcLongestStreak(data);
-      const mostDay = mostConsistentDayOfWeek(data);
-      const completedThisMonth = (viewYear === today.getFullYear())
-        ? totalHabitsThisMonth(data, viewYear, today.getMonth())
-        : 0;
-
-      const catBarsHTML = cfg.categories.map(cat => {
-        const pct = (viewYear === today.getFullYear())
-          ? categoryCompletionThisMonth(data, viewYear, today.getMonth(), cat.id)
-          : 0;
-        return `<div class="analytics-bar">
-          <div class="analytics-label">${cat.name}</div>
-          <div class="analytics-bar-bg"><div class="analytics-bar-fill" style="width:${pct}%; background:${cat.color};"></div></div>
-          <div class="analytics-pct">${pct}%</div>
-        </div>`;
-      }).join('');
-
-      const analyticsHTML = `
-        <div class="hm-analytics">
-          <div class="analytics-grid">
-            <div class="analytics-item"><span class="analytics-label">Total habits</span><span class="analytics-value">${completedThisMonth}</span></div>
-            <div class="analytics-item"><span class="analytics-label">Streak</span><span class="analytics-value">${streak}d</span></div>
-            <div class="analytics-item"><span class="analytics-label">Best streak</span><span class="analytics-value">${longestStreak}d</span></div>
-            <div class="analytics-item"><span class="analytics-label">Consistent day</span><span class="analytics-value">${mostDay}</span></div>
-          </div>
-          <div class="analytics-bars">${catBarsHTML}</div>
-        </div>`;
-
-      document.getElementById('root').innerHTML = `
-        <div class="hm-head">
-          <span class="hm-title">${viewYear} Activity</span>
-          <div style="display:flex; gap:0.5rem; align-items:center; margin-left:auto;">
-            <div class="hm-nav">
-              <button id="yearPrev">‹</button>
-              <span>${viewYear}</span>
-              <button id="yearNext">›</button>
-            </div>
-            <div class="hm-view-toggle">
-              <button class="hm-view-btn active" id="viewYearBtn">Year</button>
-              <button class="hm-view-btn" id="viewMonthBtn">Month</button>
-              <button class="hm-view-btn" id="viewWeekBtn">Week</button>
-            </div>
-          </div>
-        </div>
-        <div class="hm-stats">${statsItems}</div>
-        ${analyticsHTML}
-        <div class="hm-outer">
-          <div class="hm-chart">
-            <div class="hm-day-labels">${dayLabelsHTML}</div>
-            <div class="hm-months-row">${monthsHTML}</div>
-          </div>
-        </div>
-        <div class="hm-filters">${filterChipsHTML}</div>
-        <div class="hm-legend">
-          <span>Less</span>
-          <div class="legend-cell lv0"></div>
-          <div class="legend-cell lv1"></div>
-          <div class="legend-cell lv2"></div>
-          <div class="legend-cell lv3"></div>
-          <div class="legend-cell lv4"></div>
-          <span>More</span>
-        </div>`;
-
-      document.getElementById('yearPrev').addEventListener('click', () => { viewYear--; renderYear(); });
-      document.getElementById('yearNext').addEventListener('click', () => { viewYear++; renderYear(); });
-
-      // View toggle buttons
-      document.getElementById('viewYearBtn').addEventListener('click', () => { viewMode = 'year'; renderYear(); });
-      document.getElementById('viewMonthBtn').addEventListener('click', () => { viewMode = 'month'; renderMonth(); });
-      document.getElementById('viewWeekBtn').addEventListener('click', () => { viewMode = 'week'; viewWeekStart = getMondayOfWeek(new Date()); renderWeek(); });
-
-      // Month label clicks → switch to month view
-      document.querySelectorAll('.hm-month-label').forEach(label => {
-        label.addEventListener('click', () => {
-          viewMode = 'month';
-          viewMonth = parseInt(label.dataset.month);
-          renderMonth();
-        });
-      });
-
-      // Filter chip clicks
-      document.querySelectorAll('.filter-chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-          const catId = chip.dataset.cat;
-          if (activeFilters.has(catId)) {
-            activeFilters.delete(catId);
-          } else {
-            activeFilters.add(catId);
-          }
-          renderYear();
-        });
-      });
-    }
-
-    // ── View state ────────────────────────────────────────────
-    let viewMode      = 'year';    // 'year', 'month', 'week'
-    let viewMonth     = new Date().getMonth();  // 0-11
-    let viewWeekStart = null;      // Date object (Monday of week)
-    let activeFilters = new Set(); // Populated after cfg loads
-
-    // ── Utility: ISO week number ────────────────────────────
-    function getISOWeek(d) {
-      const date = new Date(d);
-      date.setHours(0, 0, 0, 0);
-      date.setDate(date.getDate() + 4 - (date.getDay() || 7));
-      const yearStart = new Date(date.getFullYear(), 0, 1);
-      const weekNum = Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
-      return weekNum;
-    }
-
-    function getMonthDays(year, month) {
+    function buildWeeks(year) {
+      const jan1 = new Date(year, 0, 1);
+      const dec31 = new Date(year, 11, 31);
+      const start = getMondayOfWeek(jan1);
       const weeks = [];
-      const firstDay = new Date(year, month, 1);
-      const dow = firstDay.getDay();
-      const offset = dow === 0 ? -6 : 1 - dow;
-      const start = new Date(year, month, 1 + offset);
-      const end = new Date(year, month + 1, 0);
-
       let cur = new Date(start);
-      while (cur <= end) {
-        const week = [];
-        for (let i = 0; i < 7; i++) {
-          const day = new Date(cur);
-          day.setDate(cur.getDate() + i);
-          const inMonth = day.getMonth() === month;
-          week.push(inMonth ? day : null);
-        }
-        weeks.push(week);
-        cur.setDate(cur.getDate() + 7);
+      while (cur <= dec31 || weeks.length < 52) {
+        const wk = [];
+        for (let i = 0; i < 7; i++) { wk.push(new Date(cur)); cur.setDate(cur.getDate() + 1); }
+        weeks.push(wk);
+        if (cur > dec31 && weeks.length >= 52) break;
+        if (weeks.length >= 54) break;
       }
       return weeks;
     }
 
-    function getMondayOfWeek(d) {
-      const date = new Date(d);
-      const day = date.getDay();
-      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-      return new Date(date.getFullYear(), date.getMonth(), diff);
+    // ─── Stats ──────────────────────────────────────
+    function countActive(data) {
+      let n = 0;
+      for (const d of Object.values(data))
+        if (d && typeof d === 'object' && Object.values(d).some(p => p > 0)) n++;
+      return n;
+    }
+    function calcStreak(data) {
+      let s = 0, d = new Date();
+      while (true) {
+        const day = data[iso(d)];
+        if (day && typeof day === 'object' && Object.values(day).some(p => p > 0)) {
+          s++; d.setDate(d.getDate() - 1);
+        } else break;
+      }
+      return s;
+    }
+    function monthPct(data, year, month) {
+      const dim = new Date(year, month + 1, 0).getDate();
+      let a = 0;
+      for (let i = 1; i <= dim; i++) {
+        const k = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+        const d = data[k];
+        if (d && typeof d === 'object' && Object.values(d).some(p => p > 0)) a++;
+      }
+      return Math.round(a / dim * 100);
     }
 
-    // ── Month view render ─────────────────────────────────────
+    // ─── Rendering ──────────────────────────────────
+    function render() {
+      if (viewMode === 'year') renderYear();
+      else if (viewMode === 'month') renderMonth();
+      else renderWeek();
+    }
+
+    function headerHTML() {
+      let nav = '';
+      if (viewMode === 'year') {
+        nav = `<button data-act="py">‹</button><span class="hm-nav-label">${viewYear}</span><button data-act="ny">›</button>`;
+      } else if (viewMode === 'month') {
+        nav = `<button data-act="pm">‹</button><span class="hm-nav-label">${MONTH_FULL[viewMonth]} ${viewYear}</span><button data-act="nm">›</button>`;
+      } else {
+        const ws = viewWeekStart, we = new Date(ws); we.setDate(we.getDate() + 6);
+        nav = `<button data-act="pw">‹</button><span class="hm-nav-label">${MONTHS[ws.getMonth()]} ${ws.getDate()} – ${MONTHS[we.getMonth()]} ${we.getDate()}</span><button data-act="nw">›</button>`;
+      }
+      return `<div class="hm-header">
+        <div class="hm-title">${viewYear} Activity</div>
+        <div class="hm-controls">
+          <div class="hm-nav">${nav}</div>
+          <div class="hm-views">
+            <button data-view="year" class="${viewMode==='year'?'active':''}">Y</button>
+            <button data-view="month" class="${viewMode==='month'?'active':''}">M</button>
+            <button data-view="week" class="${viewMode==='week'?'active':''}">W</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function statsHTML() {
+      const data = loadData(viewYear);
+      return `<div class="hm-stats">
+        <span><span class="hm-stat-val">${countActive(data)}</span> active</span>
+        <span><span class="hm-stat-val">${calcStreak(data)}</span> streak</span>
+        <span><span class="hm-stat-val">${monthPct(data, viewYear, new Date().getMonth())}%</span> this month</span>
+      </div>`;
+    }
+
+    function bottomHTML() {
+      const chips = cfg.categories.map(c => {
+        const on = activeFilters.has(c.id);
+        return `<button class="filter-chip${on?' active':''}" data-cat="${c.id}"
+          style="${on?'background:'+c.color+';border-color:'+c.color:''}">
+          <span class="filter-dot" style="background:${on?'#fff':c.color}"></span>${c.name}</button>`;
+      }).join('');
+      return `<div class="hm-bottom">
+        <div class="hm-filters">${chips}</div>
+        <div class="hm-legend"><span>Less</span>
+          <span class="legend-cell lv0"></span><span class="legend-cell lv1"></span>
+          <span class="legend-cell lv2"></span><span class="legend-cell lv3"></span>
+          <span class="legend-cell lv4"></span><span>More</span>
+        </div>
+      </div>`;
+    }
+
+    function renderYear() {
+      const data = loadData(viewYear), weeks = buildWeeks(viewYear);
+      // Month labels — placed at the first week whose Thursday falls in a new month
+      const mLabels = []; let curM = -1;
+      weeks.forEach((wk, wi) => {
+        const m = wk[3].getMonth();
+        if (m !== curM) { mLabels.push({ m, wi }); curM = m; }
+      });
+
+      let grid = '<div class="hm-day-labels">';
+      for (let i = 0; i < 7; i++)
+        grid += `<div class="hm-day-label">${i % 2 === 0 ? DAYS[i] : ''}</div>`;
+      grid += '</div><div class="hm-year-cols">';
+
+      weeks.forEach((wk, wi) => {
+        let col = '<div class="hm-week-col">';
+        const lbl = mLabels.find(l => l.wi === wi);
+        col += lbl
+          ? `<div class="hm-month-label" data-month="${lbl.m}">${MONTHS[lbl.m]}</div>`
+          : '<div class="hm-month-label"></div>';
+        wk.forEach(d => {
+          if (d.getFullYear() !== viewYear) { col += '<div class="cell empty"></div>'; return; }
+          const k = iso(d), lv = getIntensity(data[k]);
+          const cls = ['cell', 'lv' + lv];
+          if (isToday(d)) cls.push('today');
+          if (isFuture(d)) cls.push('future');
+          col += `<div class="${cls.join(' ')}" data-date="${k}" tabindex="0"></div>`;
+        });
+        col += '</div>';
+        grid += col;
+      });
+      grid += '</div>';
+
+      root.innerHTML = headerHTML() + statsHTML() +
+        `<div class="hm-year-scroll"><div class="hm-year">${grid}</div></div>` + bottomHTML();
+    }
+
     function renderMonth() {
       const data = loadData(viewYear);
-      const weeks = getMonthDays(viewYear, viewMonth);
-      const monthName = MONTHS[viewMonth];
-
-      // Header with back button and month nav
-      const header = `
-        <div class="hm-head">
-          <span class="hm-title">${monthName} ${viewYear}</span>
-          <div class="hm-nav">
-            <button id="backToYearBtn">← Year</button>
-            <button id="monthPrev">‹</button>
-            <span>${monthName}</span>
-            <button id="monthNext">›</button>
-          </div>
-        </div>`;
-
-      // Month grid
-      const dayLabels = `
-        <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:0.5rem; font-size:0.65rem; color:var(--color-text-muted); font-weight:600;">
-          <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
-        </div>`;
-
-      const cellsHTML = weeks.map((week, wi) => {
-        return week.map((d, di) => {
-          if (!d) return `<div style="width:28px;height:28px;"></div>`;
-          const key = iso(d);
-          const lv = dayLevel(data, key);
-          const dayNum = d.getDate();
-          const day = data[key] || {};
-          const barSegs = cfg.categories.map(cat => {
-            const val = day[cat.id] ?? 0;
-            const w = val > 0 ? Math.max(3, Math.round(val * 0.24)) : 0;
-            return w > 0 ? `<div class="mini-bar-seg" style="background:${cat.color};width:${w}px;"></div>` : '';
-          }).join('');
-          const miniBar = barSegs ? `<div class="mini-bar">${barSegs}</div>` : '';
-          const cls = `month-cell cell lv${lv}${isToday(d) ? ' is-today' : ''}`;
-          return `<div class="${cls}" data-date="${key}" style="--chip-color:var(--color-accent)">
-            <div class="day-num">${dayNum}</div>
-            ${miniBar}
-          </div>`;
-        }).join('');
-      }).join('');
-
-      const grid = `<div class="month-grid">${dayLabels}${cellsHTML}</div>`;
-
-      document.getElementById('root').innerHTML = header + grid;
-
-      document.getElementById('backToYearBtn').addEventListener('click', () => { viewMode = 'year'; renderYear(); });
-      document.getElementById('monthPrev').addEventListener('click', () => {
-        viewMonth = (viewMonth - 1 + 12) % 12;
-        if (viewMonth === 11) viewYear--;
-        renderMonth();
-      });
-      document.getElementById('monthNext').addEventListener('click', () => {
-        viewMonth = (viewMonth + 1) % 12;
-        if (viewMonth === 0) viewYear++;
-        renderMonth();
-      });
+      const dim = new Date(viewYear, viewMonth + 1, 0).getDate();
+      const firstDow = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7;
+      let g = DAYS.map(d => `<div class="hm-month-day-header">${d}</div>`).join('');
+      for (let i = 0; i < firstDow; i++) g += '<div class="month-cell empty"></div>';
+      for (let d = 1; d <= dim; d++) {
+        const k = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dt = new Date(viewYear, viewMonth, d);
+        const lv = getIntensity(data[k]);
+        const cls = ['month-cell', 'lv' + lv];
+        if (isToday(dt)) cls.push('today');
+        if (isFuture(dt)) cls.push('future');
+        g += `<div class="${cls.join(' ')}" data-date="${k}"><span class="day-num">${d}</span></div>`;
+      }
+      root.innerHTML = headerHTML() + statsHTML() +
+        `<div class="hm-month-view"><div class="hm-month-grid">${g}</div></div>` + bottomHTML();
     }
 
-    // ── Week view render ──────────────────────────────────────
     function renderWeek() {
-      const data = loadData(viewYear);
       if (!viewWeekStart) viewWeekStart = getMondayOfWeek(new Date());
-
-      const week = [];
+      const yr = viewWeekStart.getFullYear();
+      const data = loadData(yr);
+      let rows = '';
       for (let i = 0; i < 7; i++) {
-        const d = new Date(viewWeekStart);
-        d.setDate(d.getDate() + i);
-        week.push(d);
-      }
-
-      const weekNum = getISOWeek(viewWeekStart);
-      const header = `
-        <div class="hm-head">
-          <span class="hm-title">Week ${weekNum}, ${viewYear}</span>
-          <div class="hm-nav">
-            <button id="backToYearBtnWeek">← Year</button>
-            <button id="weekPrev">‹</button>
-            <span>Week ${weekNum}</span>
-            <button id="weekNext">›</button>
-          </div>
-        </div>`;
-
-      const rows = week.map((d, di) => {
-        const key = iso(d);
-        const dayData = data[key] || {};
-        const dayName = DAY_LABELS[di * 2] || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][di];
-        const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-
-        // Overall completion %
-        const vals = Object.values(dayData).filter(v => typeof v === 'number');
-        const overall = vals.length ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : 0;
-        const barColor = dayLevel(data, key) >= 3 ? '#39d353' : dayLevel(data, key) >= 1 ? '#9be9a8' : '#ebedf0';
-
-        // Category chips
-        const chips = cfg.categories.map(cat => {
-          const val = dayData[cat.id] ?? 0;
-          const done = val > 0 ? ' done' : '';
-          return `<button class="week-chip${done}" data-cat="${cat.id}" data-date="${key}" style="--chip-color:${cat.color};">${val}%</button>`;
+        const d = new Date(viewWeekStart); d.setDate(d.getDate() + i);
+        const k = iso(d), dd = data[k] || {};
+        const cats = cfg.categories.filter(c => activeFilters.has(c.id));
+        let avg = 0;
+        if (cats.length) avg = Math.round(cats.reduce((s, c) => s + (dd[c.id] || 0), 0) / cats.length);
+        const chips = cats.map(c => {
+          const p = dd[c.id] || 0;
+          return `<span class="week-chip${p>0?' done':''}" style="${p>0?'background:'+c.color+';border-color:'+c.color:''}">${c.name} ${p}%</span>`;
         }).join('');
-
-        return `
-          <div class="week-row">
-            <div class="week-day">${dayName}</div>
-            <div class="week-date">${dateStr}</div>
-            <div class="week-bar">
-              <div class="week-bar-fill" style="width:${overall}%; background:${barColor};"></div>
-            </div>
-            <div class="week-chips">${chips}</div>
-          </div>`;
-      }).join('');
-
-      document.getElementById('root').innerHTML = header + `<div class="week-container">${rows}</div>`;
-
-      document.getElementById('backToYearBtnWeek').addEventListener('click', () => { viewMode = 'year'; renderYear(); });
-      document.getElementById('weekPrev').addEventListener('click', () => {
-        viewWeekStart.setDate(viewWeekStart.getDate() - 7);
-        viewYear = viewWeekStart.getFullYear();
-        renderWeek();
-      });
-      document.getElementById('weekNext').addEventListener('click', () => {
-        viewWeekStart.setDate(viewWeekStart.getDate() + 7);
-        viewYear = viewWeekStart.getFullYear();
-        renderWeek();
-      });
-
-      // Category chip clicks (open quick slider or just show current value)
-      document.querySelectorAll('.week-chip').forEach(btn => {
-        btn.addEventListener('click', e => {
-          const dateKey = btn.dataset.date;
-          const catId = btn.dataset.cat;
-          // For now, just toggle 0 ↔ 100
-          const dayData = data[dateKey] || {};
-          const currentVal = dayData[catId] ?? 0;
-          const newVal = currentVal === 0 ? 100 : 0;
-          dayData[catId] = newVal;
-          data[dateKey] = dayData;
-          const year = parseInt(dateKey.slice(0, 4));
-          saveData(year, data);
-          renderWeek();
-        });
-      });
-    }
-
-    // ── Log popup ─────────────────────────────────────────────
-    const logPopup  = document.getElementById('logPopup');
-    const logDateEl = document.getElementById('logDate');
-    const logHabits = document.getElementById('logHabits');
-
-    let popupDateKey = null;
-    let popupYear    = null;
-    let popupData    = null;
-
-    // Helper: save a value and update the heatmap cell in-place
-    function saveAndUpdateCell(dateKey, catId, value) {
-      const year = parseInt(dateKey.slice(0, 4));
-      if (!popupData[dateKey]) popupData[dateKey] = {};
-      popupData[dateKey][catId] = value;
-      saveData(year, popupData);
-
-      const cell = document.querySelector(`.cell[data-date="${dateKey}"]`);
-      if (cell) {
-        const lv  = dayLevel(popupData, dateKey);
-        const tod = isToday(new Date(dateKey + 'T12:00:00')) ? ' is-today' : '';
-        const extra = cell.classList.contains('month-cell') ? 'month-cell ' : '';
-        cell.className = `${extra}cell lv${lv}${tod}`;
+        const todayCls = isToday(d) ? ' today-row' : '';
+        rows += `<div class="week-row${todayCls}" data-date="${k}">
+          <span class="week-day-name">${DAYS[i]}</span>
+          <span class="week-date">${MONTHS[d.getMonth()]} ${d.getDate()}</span>
+          <div class="week-bar"><div class="week-bar-fill" style="width:${avg}%;background:${avg?'#40c463':'transparent'}"></div></div>
+          <div class="week-chips">${chips}</div>
+        </div>`;
       }
+      root.innerHTML = headerHTML() + statsHTML() +
+        `<div class="hm-week-view">${rows}</div>` + bottomHTML();
     }
 
-    function openPopup(dateKey, cellEl) {
-      popupDateKey = dateKey;
-      popupYear    = parseInt(dateKey.slice(0, 4));
-      popupData    = loadData(popupYear);
+    // ─── Log dialog ─────────────────────────────────
+    function openLog(dateKey) {
+      const dt = parseDate(dateKey);
+      document.getElementById('dlgDate').textContent =
+        `${MONTH_FULL[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`;
+      const yr = dt.getFullYear(), data = loadData(yr), dd = data[dateKey] || {};
+      const box = document.getElementById('dlgHabits');
+      box.innerHTML = '';
 
-      // Date label
-      const d = new Date(dateKey + 'T12:00:00');
-      logDateEl.textContent = d.toLocaleDateString(undefined,
-        { month: 'long', day: 'numeric', year: 'numeric' });
-
-      // One row per category: toggle + dot + name + pct (click for slider)
-      logHabits.innerHTML = '';
       cfg.categories.forEach(cat => {
-        const val = popupData[dateKey]?.[cat.id] ?? 0;
-
-        // ── Main row: [✓] ● Name                 75%
+        const pct = dd[cat.id] || 0;
         const row = document.createElement('div');
-        row.className = 'log-row';
+        row.className = 'dlg-row';
+        row.innerHTML =
+          `<span class="dlg-dot" style="background:${cat.color}"></span>` +
+          `<span class="dlg-name">${cat.name}</span>` +
+          `<input class="dlg-slider" type="range" min="0" max="100" step="10" value="${pct}" style="accent-color:${cat.color}">` +
+          `<span class="dlg-pct">${pct}%</span>`;
+        box.appendChild(row);
 
-        const toggle = document.createElement('button');
-        toggle.className = 'log-toggle' + (val > 0 ? ' checked' : '');
-        toggle.style.setProperty('--toggle-color', cat.color);
-        toggle.textContent = '✓';
-
-        const dot = document.createElement('span');
-        dot.className = 'log-dot';
-        dot.style.background = cat.color;
-
-        const name = document.createElement('span');
-        name.className = 'log-name';
-        name.textContent = cat.name;
-        name.title = cat.name;
-
-        const pct = document.createElement('span');
-        pct.className = 'log-pct';
-        pct.textContent = val + '%';
-
-        // ── Slider row (hidden by default, expands on pct click)
-        const sliderWrap = document.createElement('div');
-        sliderWrap.className = 'log-slider-wrap';
-
-        const slider = document.createElement('input');
-        slider.type  = 'range';
-        slider.min   = '0';
-        slider.max   = '100';
-        slider.step  = '10';
-        slider.value = String(val);
-        slider.style.accentColor = cat.color;
-        sliderWrap.appendChild(slider);
-
-        // ── Toggle click: binary 0 ↔ 100
-        toggle.addEventListener('click', () => {
-          const current = popupData[dateKey]?.[cat.id] ?? 0;
-          const newVal = current > 0 ? 0 : 100;
-          toggle.classList.toggle('checked', newVal > 0);
-          pct.textContent = newVal + '%';
-          slider.value = String(newVal);
-          saveAndUpdateCell(dateKey, cat.id, newVal);
-        });
-
-        // ── Pct click: expand/collapse slider
-        pct.addEventListener('click', e => {
-          e.stopPropagation();
-          const open = sliderWrap.classList.toggle('open');
-          pct.classList.toggle('open', open);
-        });
-
-        // ── Slider input: fine-tune percentage
+        const slider = row.querySelector('input');
+        const label  = row.querySelector('.dlg-pct');
         slider.addEventListener('input', () => {
-          const v = parseInt(slider.value);
-          pct.textContent = v + '%';
-          toggle.classList.toggle('checked', v > 0);
-          saveAndUpdateCell(dateKey, cat.id, v);
+          const v = +slider.value;
+          label.textContent = v + '%';
+          const d = loadData(yr);
+          if (!d[dateKey]) d[dateKey] = {};
+          if (v > 0) d[dateKey][cat.id] = v;
+          else delete d[dateKey][cat.id];
+          if (d[dateKey] && !Object.keys(d[dateKey]).length) delete d[dateKey];
+          saveData(yr, d);
         });
-
-        row.appendChild(toggle);
-        row.appendChild(dot);
-        row.appendChild(name);
-        row.appendChild(pct);
-        logHabits.appendChild(row);
-        logHabits.appendChild(sliderWrap);
       });
 
-      // Show and position synchronously.
-      // offsetWidth/offsetHeight access inside positionPopup forces layout,
-      // so coordinates are correct without needing requestAnimationFrame.
-      logPopup.style.display = 'flex';
-      positionPopup(cellEl);
+      logDialog.showModal();
     }
 
-    function positionPopup(cellEl) {
-      const rect = cellEl.getBoundingClientRect();
-      const pw   = logPopup.offsetWidth;
-      const ph   = logPopup.offsetHeight;
-      const vw   = window.innerWidth;
-      const vh   = window.innerHeight;
-
-      let left = rect.left + rect.width / 2 - pw / 2;
-      let top  = rect.top - ph - 8;           // try above first
-      if (top < 8) top = rect.bottom + 8;    // flip below if clipped
-      left = Math.max(8, Math.min(left, vw - pw - 8));
-      top  = Math.max(8, Math.min(top,  vh - ph - 8));
-
-      logPopup.style.left = left + 'px';
-      logPopup.style.top  = top  + 'px';
-    }
-
-    function closePopup() {
-      logPopup.style.display = 'none';
-      logPopup.style.opacity = '';
-      popupDateKey = null;
-      // Defer re-render so it runs outside the current event cycle.
-      // This prevents any throw inside the render from propagating
-      // back through the click event and leaving the popup in a broken state.
-      setTimeout(() => {
-        if (viewMode === 'month') renderMonth();
-        else if (viewMode === 'week') renderWeek();
-        else renderYear();
-      }, 0);
-    }
-
-    // ── Tooltip ───────────────────────────────────────────────
-    const tooltip = document.getElementById('tooltip');
-    const ttDate  = document.getElementById('tt-date');
-    const ttItems = document.getElementById('tt-items');
-
-    let currentHoveredCell = null;
-
-    function showTooltip(dateKey, cellEl) {
-      const data = loadData(viewYear);
-      const day  = data[dateKey];
-
-      // Date label (short format: "Feb 20")
-      const d = new Date(dateKey + 'T12:00:00');
-      ttDate.textContent = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-
-      ttItems.innerHTML = '';
-      if (!day || !Object.values(day).some(v => v > 0)) {
-        // No activity
-        const empty = document.createElement('div');
-        empty.className = 'tt-empty';
-        empty.textContent = 'No activity';
-        ttItems.appendChild(empty);
-      } else {
-        // List each category with its percentage
-        cfg.categories.forEach(cat => {
-          const val = day[cat.id] ?? 0;
-          if (val > 0) {
-            const item = document.createElement('span');
-            item.className = 'tt-item';
-            item.style.color = cat.color;
-            item.textContent = `● ${cat.name} ${val}%`;
-            ttItems.appendChild(item);
-          }
-        });
-        // Fallback if no categories had activity (shouldn't happen)
-        if (!ttItems.children.length) {
-          const empty = document.createElement('div');
-          empty.className = 'tt-empty';
-          empty.textContent = 'No activity';
-          ttItems.appendChild(empty);
-        }
-      }
-
-      // Position and show
-      tooltip.setAttribute('visible', '');
-      positionTooltip(cellEl);
-    }
-
-    function positionTooltip(cellEl) {
-      const rect = cellEl.getBoundingClientRect();
-      const tw   = tooltip.offsetWidth;
-      const th   = tooltip.offsetHeight;
-      const vw   = window.innerWidth;
-      const vh   = window.innerHeight;
-
-      let left = rect.left + rect.width / 2 - tw / 2;
-      let top  = rect.top - th - 8;           // try above first
-      if (top < 8) top = rect.bottom + 8;    // flip below if clipped
-      left = Math.max(8, Math.min(left, vw - tw - 8));
-      top  = Math.max(8, Math.min(top,  vh - th - 8));
-
-      tooltip.style.left = left + 'px';
-      tooltip.style.top  = top  + 'px';
-    }
-
-    function hideTooltip() {
-      tooltip.removeAttribute('visible');
-    }
-
-    // ── Settings panel rendering ──────────────────────────────
-    // Working copy while settings panel is open (discarded on cancel)
-    let editCats = [];
+    // ─── Settings ───────────────────────────────────
+    let tempCats = [];
 
     function openSettings() {
-      // Clone current categories into editCats
-      editCats = cfg.categories.map(c => ({ ...c }));
+      tempCats = cfg.categories.map(c => ({ ...c }));
       renderCatList();
-      document.getElementById('settingsPanel').classList.add('open');
+      settingsPanel.classList.add('open');
     }
-
-    function closeSettings() {
-      document.getElementById('settingsPanel').classList.remove('open');
-    }
+    function closeSettings() { settingsPanel.classList.remove('open'); }
 
     function renderCatList() {
-      const list = document.getElementById('catList');
-      list.innerHTML = '';
-      editCats.forEach((cat, i) => {
+      const el = document.getElementById('catList');
+      el.innerHTML = '';
+      tempCats.forEach((cat, i) => {
         const row = document.createElement('div');
         row.className = 'cat-row';
-
-        const colorInput = document.createElement('input');
-        colorInput.type = 'color';
-        colorInput.className = 'cat-color';
-        colorInput.value = cat.color;
-        colorInput.title = 'Pick colour';
-        colorInput.addEventListener('input', () => { editCats[i].color = colorInput.value; });
-
-        const nameInput = document.createElement('input');
-        nameInput.type = 'text';
-        nameInput.className = 'cat-name';
-        nameInput.value = cat.name;
-        nameInput.placeholder = 'Category name';
-        nameInput.addEventListener('input', () => { editCats[i].name = nameInput.value; });
-
-        const delBtn = document.createElement('button');
-        delBtn.className = 'cat-del';
-        delBtn.textContent = '×';
-        delBtn.title = 'Delete category';
-        delBtn.addEventListener('click', () => {
-          editCats.splice(i, 1);
-          renderCatList();
-        });
-
-        row.appendChild(colorInput);
-        row.appendChild(nameInput);
-        row.appendChild(delBtn);
-        list.appendChild(row);
+        row.innerHTML =
+          `<input type="color" value="${cat.color}" data-i="${i}">` +
+          `<input type="text" value="${cat.name}" data-i="${i}" placeholder="Category name">` +
+          `<button class="cat-del" data-i="${i}" title="Delete">✕</button>`;
+        el.appendChild(row);
       });
     }
 
-    function saveSettings() {
-      // Validate: remove unnamed categories
-      cfg.categories = editCats
-        .map(c => ({ ...c, name: c.name.trim() }))
-        .filter(c => c.name.length > 0);
-      if (!cfg.categories.length) {
-        cfg.categories = DEFAULT_CATEGORIES.map(c => ({ ...c, id: uid() }));
+    // ─── Tooltip ────────────────────────────────────
+    function showTooltip(cell, dateKey) {
+      const data = loadData(viewYear), dd = data[dateKey], dt = parseDate(dateKey);
+      let html = `<b>${MONTH_FULL[dt.getMonth()]} ${dt.getDate()}</b>`;
+      if (dd && typeof dd === 'object') {
+        const items = cfg.categories.filter(c => dd[c.id] > 0);
+        html += items.length
+          ? '<br>' + items.map(c => `${c.name}: ${dd[c.id]}%`).join(', ')
+          : '<br>No activity';
+      } else html += '<br>No activity';
+      tooltip.innerHTML = html;
+      const r = cell.getBoundingClientRect();
+      tooltip.style.left = (r.left + r.width / 2 - tooltip.offsetWidth / 2) + 'px';
+      tooltip.style.top  = (r.top - tooltip.offsetHeight - 6) + 'px';
+      tooltip.classList.add('visible');
+    }
+    function hideTooltip() { tooltip.classList.remove('visible'); }
+
+    // ─── Events ─────────────────────────────────────
+    root.addEventListener('click', e => {
+      // Cell click → open log
+      const cell = e.target.closest('[data-date]');
+      if (cell && (cell.classList.contains('cell') || cell.classList.contains('month-cell') || cell.classList.contains('week-row'))) {
+        openLog(cell.dataset.date);
+        return;
       }
-      saveCfg();
+      // View toggle
+      const vb = e.target.closest('[data-view]');
+      if (vb) {
+        const m = vb.dataset.view;
+        if (m !== viewMode) {
+          viewMode = m;
+          if (m === 'week' && !viewWeekStart) viewWeekStart = getMondayOfWeek(new Date());
+          render();
+        }
+        return;
+      }
+      // Navigation
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (act === 'py') { viewYear--; render(); }
+      else if (act === 'ny') { viewYear++; render(); }
+      else if (act === 'pm') { viewMonth--; if (viewMonth < 0) { viewMonth = 11; viewYear--; } render(); }
+      else if (act === 'nm') { viewMonth++; if (viewMonth > 11) { viewMonth = 0; viewYear++; } render(); }
+      else if (act === 'pw') { viewWeekStart.setDate(viewWeekStart.getDate() - 7); viewYear = viewWeekStart.getFullYear(); render(); }
+      else if (act === 'nw') { viewWeekStart.setDate(viewWeekStart.getDate() + 7); viewYear = viewWeekStart.getFullYear(); render(); }
+      // Month label → month view
+      const ml = e.target.closest('[data-month]');
+      if (ml && ml.classList.contains('hm-month-label')) {
+        viewMonth = +ml.dataset.month; viewMode = 'month'; render(); return;
+      }
+      // Filter chip
+      const fc = e.target.closest('[data-cat]');
+      if (fc && fc.classList.contains('filter-chip')) {
+        const id = fc.dataset.cat;
+        activeFilters.has(id) ? activeFilters.delete(id) : activeFilters.add(id);
+        render();
+      }
+    });
+
+    // Hover tooltip
+    root.addEventListener('mouseover', e => {
+      const c = e.target.closest('.cell:not(.empty), .month-cell:not(.empty)');
+      if (c?.dataset.date) showTooltip(c, c.dataset.date);
+    });
+    root.addEventListener('mouseout', e => {
+      if (e.target.closest('.cell, .month-cell')) hideTooltip();
+    });
+
+    // Dialog events
+    document.getElementById('dlgDone').addEventListener('click', () => { logDialog.close(); render(); });
+    logDialog.addEventListener('click', e => { if (e.target === logDialog) { logDialog.close(); render(); } });
+
+    // Settings events
+    document.getElementById('gearBtn').addEventListener('click', openSettings);
+    document.getElementById('cancelSettingsBtn').addEventListener('click', closeSettings);
+    document.getElementById('addCatBtn').addEventListener('click', () => {
+      tempCats.push({ id: uid(), name: '', color: '#888888' });
+      renderCatList();
+    });
+    document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+      const rows = document.getElementById('catList').querySelectorAll('.cat-row');
+      const nc = [];
+      rows.forEach((r, i) => {
+        const name = r.querySelector('input[type="text"]').value.trim();
+        const color = r.querySelector('input[type="color"]').value;
+        if (name) nc.push({ id: tempCats[i].id, name, color });
+      });
+      cfg.categories = nc;
+      saveCfg(cfg);
       activeFilters = new Set(cfg.categories.map(c => c.id));
       closeSettings();
-      renderYear();
-    }
-
-    // ── Wire up popup ─────────────────────────────────────────
-    // Cell click (event delegation — survives re-renders of #root's children)
-    document.getElementById('root').addEventListener('click', e => {
-      const cell = e.target.closest('.cell:not(.is-empty)');
-      if (cell) openPopup(cell.dataset.date, cell);
+      render();
+    });
+    document.getElementById('catList').addEventListener('click', e => {
+      const btn = e.target.closest('.cat-del');
+      if (btn) { tempCats.splice(+btn.dataset.i, 1); renderCatList(); }
     });
 
-    // Keyboard navigation: Enter on cell to open popup
-    document.getElementById('root').addEventListener('keydown', e => {
+    // Keyboard — Enter on cell
+    root.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
-        const cell = e.target.closest('.cell:not(.is-empty)');
-        if (cell) {
-          e.preventDefault();
-          openPopup(cell.dataset.date, cell);
-        }
+        const c = e.target.closest('.cell:not(.empty), .month-cell:not(.empty)');
+        if (c?.dataset.date) openLog(c.dataset.date);
       }
     });
 
-    // Click outside popup → close
-    document.addEventListener('click', e => {
-      if (logPopup.style.display === 'flex' &&
-          !logPopup.contains(e.target) &&
-          !e.target.closest('.cell:not(.is-empty)')) {
-        closePopup();
-      }
-    });
-
-    document.getElementById('logClose').addEventListener('click', e => {
-      e.stopPropagation();
-      closePopup();
-    });
-
-    // Settings shortcut from inside the popup
-    document.getElementById('logManage').addEventListener('click', e => {
-      e.stopPropagation();
-      closePopup();
-      openSettings();
-    });
-
-    // Tooltip on hover (event delegation)
-    document.getElementById('root').addEventListener('mouseover', e => {
-      const cell = e.target.closest('.cell:not(.is-empty)');
-      if (cell && cell !== currentHoveredCell) {
-        currentHoveredCell = cell;
-        showTooltip(cell.dataset.date, cell);
-      }
-    });
-
-    document.getElementById('root').addEventListener('mouseout', e => {
-      const cell = e.target.closest('.cell:not(.is-empty)');
-      if (cell && cell === currentHoveredCell) {
-        currentHoveredCell = null;
-        hideTooltip();
-      }
-    });
-
-    // ── Wire up settings UI ───────────────────────────────────
-    document.getElementById('gearBtn').addEventListener('click', openSettings);
-    document.getElementById('settingsCloseBtn').addEventListener('click', closeSettings);
-    document.getElementById('cancelSettingsBtn').addEventListener('click', closeSettings);
-    document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
-
-    document.getElementById('addCatBtn').addEventListener('click', () => {
-      editCats.push({ id: uid(), name: '', color: '#6b7280' });
-      renderCatList();
-      // Focus the last name input
-      const inputs = document.querySelectorAll('.cat-name');
-      if (inputs.length) inputs[inputs.length - 1].focus();
-    });
-
-    // ── Init ─────────────────────────────────────────────────
-    loadCfg();
-    activeFilters = new Set(cfg.categories.map(c => c.id));
+    // ─── Init ───────────────────────────────────────
+    cfg = loadCfg();
     migrateOldData();
-    renderYear();
+    activeFilters = new Set(cfg.categories.map(c => c.id));
+    render();
+  })();
   </script>
 </body>
 </html>
