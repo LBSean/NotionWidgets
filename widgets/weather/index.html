@@ -34,19 +34,6 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .refresh-btn {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--color-text-muted);
-      font-size: 0.85rem;
-      padding: 2px 4px;
-      border-radius: var(--radius-sm);
-      line-height: 1;
-      transition: color 0.15s;
-    }
-    .refresh-btn:hover { color: var(--color-text); }
-
     /* ── Current conditions ─────────────────────── */
     .current {
       display: flex;
@@ -127,20 +114,6 @@
     }
 
     /* ── Settings panel ─────────────────────────── */
-    .gear-btn {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--color-text-muted);
-      font-size: 1rem;
-      padding: 2px 4px;
-      border-radius: var(--radius-sm);
-      line-height: 1;
-      transition: color 0.15s;
-      flex-shrink: 0;
-    }
-    .gear-btn:hover { color: var(--color-text); }
-
     .settings-panel {
       position: absolute;
       inset: 0;
@@ -260,17 +233,19 @@
 </head>
 <body>
 
-  <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
-    <span class="theme-switch__icon">☀</span>
-    <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
-    <span class="theme-switch__icon">🌙</span>
-  </button>
+  <div class="widget-bar">
+    <button id="refreshBtn" title="Refresh">↺</button>
+    <button id="gearBtn" title="Settings">⚙</button>
+    <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
+      <span class="theme-switch__icon">☀</span>
+      <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
+      <span class="theme-switch__icon">🌙</span>
+    </button>
+  </div>
 
   <!-- Main content -->
   <div class="header">
     <span class="city-name" id="cityName">—</span>
-    <button class="refresh-btn" id="refreshBtn" title="Refresh">↺</button>
-    <button class="gear-btn" id="gearBtn" title="Settings">⚙</button>
   </div>
 
   <div id="statusEl" class="status">Loading…</div>

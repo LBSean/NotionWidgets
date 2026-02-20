@@ -67,24 +67,48 @@ html[data-theme="light"] {
   --color-border:     rgba(55, 53, 47, 0.09);
 }
 
-/* ── Theme toggle switch (shared across all widgets) ── */
-.theme-switch {
+/* ── Widget control bar — fixed bottom-right ────────────────────────
+   Keeps all controls away from Notion's top-right hover toolbar.
+   Usage: <div class="widget-bar"> gear / refresh / theme-switch </div>
+   ─────────────────────────────────────────────────────────────────── */
+.widget-bar {
   position: fixed;
-  top: 8px;
+  bottom: 8px;
   right: 8px;
   z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  opacity: 0.45;
+  transition: opacity 0.2s;
+}
+.widget-bar:hover { opacity: 1; }
+
+/* Generic icon buttons inside the bar */
+.widget-bar > button:not(.theme-switch) {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  padding: 2px 5px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.widget-bar > button:not(.theme-switch):hover { color: var(--color-text); }
+
+/* ── Theme toggle switch ── */
+.theme-switch {
   display: flex;
   align-items: center;
   gap: 3px;
   cursor: pointer;
   user-select: none;
-  opacity: 0.45;
-  transition: opacity 0.2s;
   background: none;
   border: none;
-  padding: 2px 4px;
+  padding: 2px 0;
 }
-.theme-switch:hover { opacity: 1; }
 .theme-switch__icon { font-size: 0.6rem; line-height: 1; }
 .theme-switch__track {
   position: relative;

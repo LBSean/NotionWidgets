@@ -102,10 +102,6 @@
       letter-spacing: -0.02em;
     }
 
-    .ticker__gear {
-      margin-top: 1rem;
-    }
-
     /* ── Setup prompt ─────────────────────────────────── */
     .setup {
       text-align: center;
@@ -249,11 +245,14 @@
 </head>
 <body>
 
-  <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
-    <span class="theme-switch__icon">☀</span>
-    <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
-    <span class="theme-switch__icon">🌙</span>
-  </button>
+  <div class="widget-bar">
+    <button id="gearBtn" title="Settings">⚙</button>
+    <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
+      <span class="theme-switch__icon">☀</span>
+      <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
+      <span class="theme-switch__icon">🌙</span>
+    </button>
+  </div>
 
   <!-- Dynamic main area -->
   <div id="main"></div>
@@ -300,9 +299,11 @@
     const main  = document.getElementById('main');
     const panel = document.getElementById('settingsPanel');
 
-    // ── Delegation on static containers ───────────────
+    // ── Static gear button ────────────────────────────
+    document.getElementById('gearBtn').addEventListener('click', openSettings);
+
+    // ── Delegation for setup button (rendered in main) ─
     main.addEventListener('click', e => {
-      if (e.target.id === 'gearBtn')  openSettings();
       if (e.target.id === 'setupBtn') openSettings();
     });
 
@@ -347,7 +348,6 @@
             <div class="ticker__name">${esc(cfg.name)}</div>
             <div class="ticker__today">Today!</div>
             <div class="ticker__date-label">${dateLabel}</div>
-            <div class="ticker__gear"><button class="btn-icon" id="gearBtn">⚙</button></div>
           </div>`;
         return;
       }
@@ -390,7 +390,6 @@
           <div class="ticker__units">${numHTML}</div>
           ${subHTML}
           <div class="ticker__date-label">${dateLabel}</div>
-          <div class="ticker__gear"><button class="btn-icon" id="gearBtn">⚙</button></div>
         </div>`;
     }
 

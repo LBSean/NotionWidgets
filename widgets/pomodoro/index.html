@@ -422,11 +422,14 @@
 </head>
 <body data-mode="work">
 
-  <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
-    <span class="theme-switch__icon">☀</span>
-    <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
-    <span class="theme-switch__icon">🌙</span>
-  </button>
+  <div class="widget-bar">
+    <button id="settingsBtn" title="Settings">⚙</button>
+    <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
+      <span class="theme-switch__icon">☀</span>
+      <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
+      <span class="theme-switch__icon">🌙</span>
+    </button>
+  </div>
 
   <!-- ── Main timer ──────────────────────────────────────────── -->
   <div class="pomo">
@@ -441,7 +444,6 @@
 
     <div class="pomo__footer">
       <span class="pomo__log" id="logStatus"></span>
-      <button class="btn-icon" id="settingsBtn" title="Settings">⚙</button>
     </div>
   </div>
 

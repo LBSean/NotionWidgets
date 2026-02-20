@@ -233,17 +233,19 @@
 </head>
 <body>
 
-  <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
-    <span class="theme-switch__icon">☀</span>
-    <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
-    <span class="theme-switch__icon">🌙</span>
-  </button>
+  <div class="widget-bar">
+    <button id="refreshBtn" title="Refresh">↺</button>
+    <button id="gearBtn" title="Settings">⚙</button>
+    <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
+      <span class="theme-switch__icon">☀</span>
+      <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
+      <span class="theme-switch__icon">🌙</span>
+    </button>
+  </div>
 
   <!-- Main view -->
   <div class="header">
     <span class="feed-title" id="feedTitle">News</span>
-    <button class="icon-btn" id="refreshBtn" title="Refresh">↺</button>
-    <button class="icon-btn" id="gearBtn" title="Settings">⚙</button>
   </div>
 
   <div id="statusEl" class="status">Loading…</div>

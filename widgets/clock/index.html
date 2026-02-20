@@ -39,11 +39,13 @@
 </head>
 <body>
 
-  <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
-    <span class="theme-switch__icon">☀</span>
-    <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
-    <span class="theme-switch__icon">🌙</span>
-  </button>
+  <div class="widget-bar">
+    <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
+      <span class="theme-switch__icon">☀</span>
+      <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
+      <span class="theme-switch__icon">🌙</span>
+    </button>
+  </div>
 
   <div class="clock">
     <div class="clock__time" id="time">--:--:--</div>
