@@ -100,30 +100,30 @@
       align-items: center;
     }
 
-    /* Weeks area */
-    .hm-grid {
-      position: relative;
-      flex: 1;
+    /* Month columns */
+    .hm-months-row {
+      display: flex;
+      flex-direction: row;
+      gap: 6px;
     }
 
-    .hm-months {
+    .hm-month {
       display: flex;
-      position: relative;
-      height: 18px;
-      margin-bottom: 2px;
+      flex-direction: column;
+      gap: 2px;
+      flex-shrink: 0;
     }
 
     .hm-month-label {
-      position: absolute;
       font-size: 0.6rem;
       font-weight: 600;
       color: var(--color-text-muted);
-      top: 0;
+      height: 18px;
       line-height: 18px;
       white-space: nowrap;
     }
 
-    .hm-weeks {
+    .hm-month-weeks {
       display: flex;
       flex-direction: row;
       gap: 2px;
@@ -263,18 +263,21 @@
       return weeks;
     }
 
-    // Month label positions: { name, colIndex }
-    function monthLabels(weeks) {
-      const labels = [];
-      let lastMonth = -1;
-      weeks.forEach((week, col) => {
-        const first = week.find(d => d !== null);
-        if (first && first.getMonth() !== lastMonth) {
-          lastMonth = first.getMonth();
-          labels.push({ name: MONTHS[lastMonth], col });
+    // Group weeks into month buckets
+    function groupWeeksByMonth(weeks) {
+      const groups = [];
+      let current = null;
+      weeks.forEach(week => {
+        const firstDay = week.find(d => d !== null);
+        if (!firstDay) return;
+        const mi = firstDay.getMonth();
+        if (!current || current.mi !== mi) {
+          current = { mi, name: MONTHS[mi], weeks: [] };
+          groups.push(current);
         }
+        current.weeks.push(week);
       });
-      return labels;
+      return groups;
     }
 
     // ── Render ──────────────────────────────────────────────────
@@ -340,62 +343,59 @@
       });
       chart.appendChild(dayLabelCol);
 
-      // Grid
-      const gridEl = document.createElement('div');
-      gridEl.className = 'hm-grid';
+      // Month columns
+      const monthsRow = document.createElement('div');
+      monthsRow.className = 'hm-months-row';
 
-      // Month labels
-      const monthsEl = document.createElement('div');
-      monthsEl.className = 'hm-months';
-      monthLabels(weeks).forEach(({ name, col }) => {
-        const el = document.createElement('span');
-        el.className   = 'hm-month-label';
-        el.textContent = name;
-        el.style.left  = `${col * (CELL + 2)}px`;
-        monthsEl.appendChild(el);
-      });
-      gridEl.appendChild(monthsEl);
+      groupWeeksByMonth(weeks).forEach(group => {
+        const monthEl = document.createElement('div');
+        monthEl.className = 'hm-month';
 
-      // Weeks
-      const weeksEl = document.createElement('div');
-      weeksEl.className = 'hm-weeks';
+        const labelEl = document.createElement('div');
+        labelEl.className = 'hm-month-label';
+        labelEl.textContent = group.name;
+        monthEl.appendChild(labelEl);
 
-      weeks.forEach(week => {
-        const weekEl = document.createElement('div');
-        weekEl.className = 'hm-week';
-        weekEl.style.setProperty('--cell', CELL + 'px');
+        const monthWeeks = document.createElement('div');
+        monthWeeks.className = 'hm-month-weeks';
 
-        week.forEach(date => {
-          const cell = document.createElement('div');
-          cell.style.setProperty('--cell', CELL + 'px');
+        group.weeks.forEach(week => {
+          const weekEl = document.createElement('div');
+          weekEl.className = 'hm-week';
+          weekEl.style.setProperty('--cell', CELL + 'px');
 
-          if (!date) {
-            cell.className = 'cell is-empty';
-          } else {
-            const key = iso(date);
-            const on  = active.has(key);
-            cell.className = 'cell' + (on ? ' is-on' : '') + (key === today ? ' is-today' : '');
-            cell.title     = key;
-            cell.addEventListener('click', () => {
-              if (active.has(key)) active.delete(key);
-              else                  active.add(key);
-              saveActive(year, active);
-              // Just update this cell without full re-render
-              cell.classList.toggle('is-on');
-              // Update stats
-              const cnt = [...active].filter(d => d.startsWith(year)).length;
-              statsEl.innerHTML = `<strong>${cnt}</strong> ${cnt === 1 ? 'day' : 'days'} active`;
-            });
-          }
+          week.forEach(date => {
+            const cell = document.createElement('div');
+            cell.style.setProperty('--cell', CELL + 'px');
 
-          weekEl.appendChild(cell);
+            if (!date) {
+              cell.className = 'cell is-empty';
+            } else {
+              const key = iso(date);
+              const on  = active.has(key);
+              cell.className = 'cell' + (on ? ' is-on' : '') + (key === today ? ' is-today' : '');
+              cell.title     = key;
+              cell.addEventListener('click', () => {
+                if (active.has(key)) active.delete(key);
+                else                  active.add(key);
+                saveActive(year, active);
+                cell.classList.toggle('is-on');
+                const cnt = [...active].filter(d => d.startsWith(year)).length;
+                statsEl.innerHTML = `<strong>${cnt}</strong> ${cnt === 1 ? 'day' : 'days'} active`;
+              });
+            }
+
+            weekEl.appendChild(cell);
+          });
+
+          monthWeeks.appendChild(weekEl);
         });
 
-        weeksEl.appendChild(weekEl);
+        monthEl.appendChild(monthWeeks);
+        monthsRow.appendChild(monthEl);
       });
 
-      gridEl.appendChild(weeksEl);
-      chart.appendChild(gridEl);
+      chart.appendChild(monthsRow);
       outer.appendChild(chart);
       root.appendChild(outer);
 

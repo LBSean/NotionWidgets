@@ -60,11 +60,13 @@ html[data-theme="dark"] {
   --color-text:       #e8e8e6;
   --color-text-muted: #9b9a97;
   --color-border:     rgba(255, 255, 255, 0.08);
+  background: #191919;
 }
 html[data-theme="light"] {
   --color-text:       #37352f;
   --color-text-muted: #6b7280;
   --color-border:     rgba(55, 53, 47, 0.09);
+  background: #f7f7f5;
 }
 
 /* ── Widget control bar — fixed bottom-right ────────────────────────

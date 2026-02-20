@@ -16,41 +16,74 @@
       padding: 0.75rem 1rem 0.55rem;
     }
 
-    /* ── Header ──────────────────────────────────────── */
-    .header {
+    /* ── Tab bar ──────────────────────────────────────── */
+    .tab-bar {
       display: flex;
       align-items: center;
-      gap: 0.3rem;
-      margin-bottom: 0.5rem;
+      gap: 4px;
+      margin-bottom: 0.45rem;
+      flex-shrink: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      padding-bottom: 3px;
+      border-bottom: 1px solid rgba(161, 98, 7, 0.12);
+    }
+    .tab-bar::-webkit-scrollbar { display: none; }
+
+    .tab {
+      padding: 0.22rem 0.5rem;
+      border-radius: 5px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: #a16207;
+      background: transparent;
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      white-space: nowrap;
+      max-width: 110px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: background 0.15s, border-color 0.15s;
       flex-shrink: 0;
     }
-
-    .title {
-      font-size: 0.6rem;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: #a16207;
-      flex: 1;
+    .tab:hover { background: rgba(0,0,0,0.04); }
+    .tab.active {
+      background: rgba(217, 119, 6, 0.1);
+      border-color: #d97706;
+      color: #92400e;
     }
 
-    .icon-btn {
-      background: none;
+    .tab-title-input {
       border: none;
+      outline: none;
+      background: transparent;
+      font: inherit;
+      color: inherit;
+      width: 70px;
+      padding: 0;
+    }
+
+    .tab-add {
+      background: none;
+      border: 1.5px dashed rgba(161, 98, 7, 0.25);
+      border-radius: 5px;
       cursor: pointer;
       color: #a16207;
-      font-size: 1.1rem;
+      font-size: 0.78rem;
       width: 22px;
       height: 22px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 4px;
-      line-height: 1;
-      transition: background 0.15s, color 0.15s;
+      flex-shrink: 0;
+      transition: background 0.15s, border-color 0.15s;
     }
-    .icon-btn:hover { background: rgba(0,0,0,0.07); }
-    .icon-btn.danger { color: #dc2626; }
+    .tab-add:hover {
+      background: rgba(0,0,0,0.04);
+      border-color: #a16207;
+    }
 
     /* ── Note area ───────────────────────────────────── */
     textarea {
@@ -78,6 +111,24 @@
       flex-shrink: 0;
     }
 
+    .icon-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #a16207;
+      font-size: 1rem;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      line-height: 1;
+      transition: background 0.15s, color 0.15s;
+    }
+    .icon-btn:hover { background: rgba(0,0,0,0.07); }
+    .icon-btn.danger { color: #dc2626; }
+
     .saved-dot {
       width: 5px;
       height: 5px;
@@ -100,21 +151,25 @@
       body { background: #2a270f; }
       textarea { color: #e8e3c0; }
       textarea::placeholder { color: #7a6820; }
-      .title, .word-count { color: #c4a83a; }
+      .word-count { color: #c4a83a; }
       .icon-btn { color: #c4a83a; }
     }
 
     html[data-theme="dark"]  body                   { background: #2a270f; }
     html[data-theme="dark"]  textarea               { color: #e8e3c0; }
     html[data-theme="dark"]  textarea::placeholder  { color: #7a6820; }
-    html[data-theme="dark"]  .title,
     html[data-theme="dark"]  .word-count            { color: #c4a83a; }
     html[data-theme="dark"]  .icon-btn              { color: #c4a83a; }
+    html[data-theme="dark"]  .tab                   { color: #c4a83a; }
+    html[data-theme="dark"]  .tab.active            { background: rgba(196, 168, 58, 0.12); border-color: #c4a83a; color: #e8e3c0; }
+    html[data-theme="dark"]  .tab-bar               { border-bottom-color: rgba(255,255,255,0.06); }
+    html[data-theme="dark"]  .tab-add               { color: #c4a83a; border-color: rgba(196, 168, 58, 0.25); }
     html[data-theme="light"] body                   { background: #fefce8; }
     html[data-theme="light"] textarea               { color: #1c1917; }
-    html[data-theme="light"] .title,
     html[data-theme="light"] .word-count            { color: #a16207; }
     html[data-theme="light"] .icon-btn              { color: #a16207; }
+    html[data-theme="light"] .tab                   { color: #a16207; }
+    html[data-theme="light"] .tab-add               { color: #a16207; }
   </style>
 </head>
 <body>
@@ -127,32 +182,152 @@
     </button>
   </div>
 
-  <div class="header">
-    <span class="title">Note</span>
-    <button class="icon-btn" id="clearBtn" title="Clear note">×</button>
+  <div class="tab-bar" id="tabBar">
+    <button class="tab-add" id="addTabBtn" title="New note">+</button>
   </div>
 
   <textarea id="noteArea" placeholder="Capture a thought…" spellcheck="true"></textarea>
 
   <div class="footer">
     <span class="saved-dot" id="savedDot"></span>
+    <button class="icon-btn" id="clearBtn" title="Clear note">×</button>
     <span class="word-count" id="wordCount"></span>
   </div>
 
   <script>
-    const KEY      = 'sticky-note';
-    const ta       = document.getElementById('noteArea');
-    const wcEl     = document.getElementById('wordCount');
-    const savedDot = document.getElementById('savedDot');
-    const clearBtn = document.getElementById('clearBtn');
+    const STORE_KEY = 'sticky-notes';
+    const OLD_KEY   = 'sticky-note';
+    const ta        = document.getElementById('noteArea');
+    const wcEl      = document.getElementById('wordCount');
+    const savedDot  = document.getElementById('savedDot');
+    const clearBtn  = document.getElementById('clearBtn');
+    const tabBar    = document.getElementById('tabBar');
+    const addBtn    = document.getElementById('addTabBtn');
 
-    // ── Load ──────────────────────────────────────────
-    ta.value = localStorage.getItem(KEY) || '';
-    updateWc();
-    ta.focus();
-    ta.setSelectionRange(ta.value.length, ta.value.length);
+    function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
-    // ── Auto-save (debounced 700 ms) ──────────────────
+    // ── Store ───────────────────────────────────────
+    let store;
+
+    function loadStore() {
+      let s;
+      try { s = JSON.parse(localStorage.getItem(STORE_KEY)); } catch {}
+
+      if (s && s.notes && s.notes.length) {
+        store = s;
+      } else {
+        // Fresh or migrate from old single-note key
+        const oldContent = localStorage.getItem(OLD_KEY) || '';
+        const id = uid();
+        store = { notes: [{ id, title: 'Note', content: oldContent }], activeId: id };
+        if (oldContent) localStorage.removeItem(OLD_KEY);
+        saveStore();
+      }
+
+      if (!store.activeId || !store.notes.find(n => n.id === store.activeId)) {
+        store.activeId = store.notes[0].id;
+      }
+    }
+
+    function saveStore() {
+      localStorage.setItem(STORE_KEY, JSON.stringify(store));
+    }
+
+    function getActive() {
+      return store.notes.find(n => n.id === store.activeId) || store.notes[0];
+    }
+
+    // ── Tab rendering ───────────────────────────────
+    function renderTabs() {
+      tabBar.querySelectorAll('.tab').forEach(t => t.remove());
+
+      store.notes.forEach(note => {
+        const tab = document.createElement('button');
+        tab.className = 'tab' + (note.id === store.activeId ? ' active' : '');
+        tab.textContent = note.title;
+        tab.title = note.title;
+        tab.dataset.id = note.id;
+
+        tab.addEventListener('click', () => switchTab(note.id));
+        tab.addEventListener('dblclick', e => { e.stopPropagation(); startRename(tab, note); });
+        tab.addEventListener('contextmenu', e => {
+          e.preventDefault();
+          if (store.notes.length <= 1) return;
+          if (confirm('Delete "' + note.title + '"?')) deleteNote(note.id);
+        });
+
+        tabBar.insertBefore(tab, addBtn);
+      });
+    }
+
+    function switchTab(id) {
+      saveCurrent();
+      store.activeId = id;
+      saveStore();
+      loadActive();
+      renderTabs();
+    }
+
+    function loadActive() {
+      const note = getActive();
+      ta.value = note.content;
+      updateWc();
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    }
+
+    function saveCurrent() {
+      const note = getActive();
+      note.content = ta.value;
+    }
+
+    function addNote() {
+      saveCurrent();
+      const n = { id: uid(), title: 'Note', content: '' };
+      store.notes.push(n);
+      store.activeId = n.id;
+      saveStore();
+      loadActive();
+      renderTabs();
+
+      // Auto-start renaming the new tab
+      const newTab = tabBar.querySelector('.tab.active');
+      if (newTab) startRename(newTab, n);
+    }
+
+    function deleteNote(id) {
+      store.notes = store.notes.filter(n => n.id !== id);
+      if (store.activeId === id) store.activeId = store.notes[0].id;
+      saveStore();
+      loadActive();
+      renderTabs();
+    }
+
+    function startRename(tabEl, note) {
+      const input = document.createElement('input');
+      input.className = 'tab-title-input';
+      input.value = note.title;
+      tabEl.textContent = '';
+      tabEl.appendChild(input);
+      input.focus();
+      input.select();
+
+      const commit = () => {
+        note.title = input.value.trim() || 'Note';
+        saveStore();
+        renderTabs();
+      };
+
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        if (e.key === 'Escape') renderTabs();
+      });
+      // Prevent tab click from firing while renaming
+      input.addEventListener('click', e => e.stopPropagation());
+    }
+
+    // ── Auto-save (debounced 700 ms) ────────────────
     let saveTimer;
     ta.addEventListener('input', () => {
       updateWc();
@@ -161,7 +336,8 @@
     });
 
     function persist() {
-      localStorage.setItem(KEY, ta.value);
+      saveCurrent();
+      saveStore();
       flashSaved();
     }
 
@@ -173,10 +349,10 @@
 
     function updateWc() {
       const words = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
-      wcEl.textContent = words > 0 ? `${words}w` : '';
+      wcEl.textContent = words > 0 ? words + 'w' : '';
     }
 
-    // ── Two-click clear ───────────────────────────────
+    // ── Two-click clear ─────────────────────────────
     let pendingClear = false, clearTimer;
 
     clearBtn.addEventListener('click', () => {
@@ -201,6 +377,12 @@
       clearBtn.textContent = '×';
       clearBtn.classList.remove('danger');
     }
+
+    // ── Init ────────────────────────────────────────
+    loadStore();
+    renderTabs();
+    loadActive();
+    addBtn.addEventListener('click', addNote);
   </script>
 </body>
 </html>
