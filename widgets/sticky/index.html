@@ -15,14 +15,6 @@
       padding: 0.75rem 1rem 0.55rem;
     }
 
-    @media (prefers-color-scheme: dark) {
-      body { background: #2a270f; }
-      textarea { color: #e8e3c0; }
-      .title, .word-count { color: #c4a83a; }
-      .icon-btn { color: #c4a83a; }
-      textarea::placeholder { color: #7a6820; }
-    }
-
     /* ── Header ──────────────────────────────────────── */
     .header {
       display: flex;
@@ -101,6 +93,14 @@
       color: #a16207;
       opacity: 0.5;
       margin-left: auto;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body { background: #2a270f; }
+      textarea { color: #e8e3c0; }
+      textarea::placeholder { color: #7a6820; }
+      .title, .word-count { color: #c4a83a; }
+      .icon-btn { color: #c4a83a; }
     }
   </style>
 </head>
