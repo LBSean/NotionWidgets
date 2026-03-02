@@ -1,10 +1,14 @@
 {
   "name": "notion-widgets",
   "version": "1.0.0",
-  "description": "Personal Notion widgets hosted on GitHub Pages",
+  "description": "Free, open-source embeddable widgets for Notion — fork and self-host your own",
   "scripts": {
     "dev": "live-server --port=3000 --open=index.html",
-    "preview": "live-server --port=3000"
+    "preview": "live-server --port=3000",
+    "setup": "node scripts/setup-notion.js"
+  },
+  "dependencies": {
+    "@notionhq/client": "^2.2.0"
   },
   "devDependencies": {
     "live-server": "^1.2.2"
