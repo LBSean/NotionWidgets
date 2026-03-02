@@ -42,9 +42,14 @@ export default {
     // ── Route by action ─────────────────────────────────────────
     const action = data.action || 'pomodoro';
 
-    if (action === 'pomodoro')     return handlePomodoro(data, env);
-    if (action === 'habits-sync')  return handleHabitsSync(data, env);
-    if (action === 'habits-save')  return handleHabitsSave(data, env);
+    if (action === 'pomodoro')      return handlePomodoro(data, env);
+    if (action === 'habits-sync')   return handleHabitsSync(data, env);
+    if (action === 'habits-save')   return handleHabitsSave(data, env);
+    if (action === 'config-load')   return handleConfigLoad(data, env);
+    if (action === 'config-save')   return handleConfigSave(data, env);
+    if (action === 'sticky-sync')   return handleStickySync(data, env);
+    if (action === 'sticky-save')   return handleStickySave(data, env);
+    if (action === 'sticky-delete') return handleStickyDelete(data, env);
 
     return reply({ error: `Unknown action: ${action}` }, 400);
   },
@@ -235,6 +240,269 @@ async function handleHabitsSave(data, env) {
 
   const result = await notionRes.json();
   return reply({ ok: true, page_id: result.id, action: existingPage ? 'updated' : 'created' });
+}
+
+// ── Config load: read a widget's config blob ────────────────────
+async function handleConfigLoad(data, env) {
+  if (!env.NOTION_TOKEN || !env.NOTION_WIDGET_DATA_DB_ID) {
+    return reply({ error: 'Widget Data DB not configured — run: wrangler secret put NOTION_WIDGET_DATA_DB_ID' }, 500);
+  }
+
+  const { key } = data;
+  if (!key || typeof key !== 'string') {
+    return reply({ error: 'Missing or invalid "key" parameter' }, 400);
+  }
+
+  const res = await fetch(
+    `https://api.notion.com/v1/databases/${env.NOTION_WIDGET_DATA_DB_ID}/query`,
+    {
+      method: 'POST',
+      headers: notionHeaders(env),
+      body: JSON.stringify({
+        filter: { property: 'Key', title: { equals: key } },
+        page_size: 1,
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const err = await res.json();
+    return reply({ error: 'Notion query failed', message: err.message }, res.status);
+  }
+
+  const result = await res.json();
+  const page = result.results[0];
+
+  if (!page) {
+    return reply({ ok: true, data: null });
+  }
+
+  const dataStr = page.properties.Data?.rich_text?.[0]?.plain_text;
+  let parsed = null;
+  if (dataStr) {
+    try { parsed = JSON.parse(dataStr); } catch { /* return raw */ parsed = dataStr; }
+  }
+
+  return reply({ ok: true, data: parsed });
+}
+
+// ── Config save: upsert a widget's config blob ─────────────────
+async function handleConfigSave(data, env) {
+  if (!env.NOTION_TOKEN || !env.NOTION_WIDGET_DATA_DB_ID) {
+    return reply({ error: 'Widget Data DB not configured' }, 500);
+  }
+
+  const { key, data: configData } = data;
+  if (!key || configData === undefined) {
+    return reply({ error: 'Missing "key" or "data"' }, 400);
+  }
+
+  const headers = notionHeaders(env);
+
+  // Query for existing page
+  const queryRes = await fetch(
+    `https://api.notion.com/v1/databases/${env.NOTION_WIDGET_DATA_DB_ID}/query`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        filter: { property: 'Key', title: { equals: key } },
+        page_size: 1,
+      }),
+    },
+  );
+
+  if (!queryRes.ok) {
+    const err = await queryRes.json();
+    return reply({ error: 'Notion query failed', message: err.message }, queryRes.status);
+  }
+
+  const queryResult = await queryRes.json();
+  const existingPage = queryResult.results[0];
+
+  const properties = {
+    'Key':  { title:     [{ text: { content: key } }] },
+    'Data': { rich_text: [{ text: { content: JSON.stringify(configData) } }] },
+  };
+
+  let notionRes;
+  if (existingPage) {
+    notionRes = await fetch(`https://api.notion.com/v1/pages/${existingPage.id}`, {
+      method: 'PATCH', headers,
+      body: JSON.stringify({ properties }),
+    });
+  } else {
+    notionRes = await fetch('https://api.notion.com/v1/pages', {
+      method: 'POST', headers,
+      body: JSON.stringify({ parent: { database_id: env.NOTION_WIDGET_DATA_DB_ID }, properties }),
+    });
+  }
+
+  if (!notionRes.ok) {
+    const err = await notionRes.json();
+    return reply({ error: 'Notion API error', code: err.code, message: err.message }, notionRes.status);
+  }
+
+  const result = await notionRes.json();
+  return reply({ ok: true, page_id: result.id, action: existingPage ? 'updated' : 'created' });
+}
+
+// ── Sticky sync: read all notes ─────────────────────────────────
+async function handleStickySync(data, env) {
+  if (!env.NOTION_TOKEN || !env.NOTION_STICKY_DB_ID) {
+    return reply({ error: 'Sticky Notes DB not configured — run: wrangler secret put NOTION_STICKY_DB_ID' }, 500);
+  }
+
+  let allPages = [];
+  let cursor = undefined;
+  let iterations = 0;
+
+  do {
+    const queryBody = {
+      filter: {
+        property: 'Archived',
+        checkbox: { equals: false },
+      },
+      page_size: 100,
+    };
+    if (cursor) queryBody.start_cursor = cursor;
+
+    const res = await fetch(
+      `https://api.notion.com/v1/databases/${env.NOTION_STICKY_DB_ID}/query`,
+      { method: 'POST', headers: notionHeaders(env), body: JSON.stringify(queryBody) },
+    );
+
+    if (!res.ok) {
+      const err = await res.json();
+      return reply({ error: 'Notion query failed', message: err.message }, res.status);
+    }
+
+    const result = await res.json();
+    allPages = allPages.concat(result.results);
+    cursor = result.has_more ? result.next_cursor : undefined;
+    iterations++;
+  } while (cursor && iterations < 5);
+
+  const notes = allPages.map(page => ({
+    id:      page.properties.NoteId?.title?.[0]?.plain_text || '',
+    title:   page.properties.Title?.rich_text?.[0]?.plain_text || '',
+    content: page.properties.Content?.rich_text?.[0]?.plain_text || '',
+  })).filter(n => n.id);
+
+  return reply({ ok: true, notes });
+}
+
+// ── Sticky save: upsert a single note ───────────────────────────
+async function handleStickySave(data, env) {
+  if (!env.NOTION_TOKEN || !env.NOTION_STICKY_DB_ID) {
+    return reply({ error: 'Sticky Notes DB not configured' }, 500);
+  }
+
+  const { noteId, title, content } = data;
+  if (!noteId) {
+    return reply({ error: 'Missing "noteId"' }, 400);
+  }
+
+  const headers = notionHeaders(env);
+
+  // Query for existing note
+  const queryRes = await fetch(
+    `https://api.notion.com/v1/databases/${env.NOTION_STICKY_DB_ID}/query`,
+    {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        filter: { property: 'NoteId', title: { equals: noteId } },
+        page_size: 1,
+      }),
+    },
+  );
+
+  if (!queryRes.ok) {
+    const err = await queryRes.json();
+    return reply({ error: 'Notion query failed', message: err.message }, queryRes.status);
+  }
+
+  const queryResult = await queryRes.json();
+  const existingPage = queryResult.results[0];
+
+  const properties = {
+    'NoteId':  { title:     [{ text: { content: noteId } }] },
+    'Title':   { rich_text: [{ text: { content: title || '' } }] },
+    'Content': { rich_text: [{ text: { content: content || '' } }] },
+    'Archived': { checkbox: false },
+  };
+
+  let notionRes;
+  if (existingPage) {
+    notionRes = await fetch(`https://api.notion.com/v1/pages/${existingPage.id}`, {
+      method: 'PATCH', headers,
+      body: JSON.stringify({ properties }),
+    });
+  } else {
+    notionRes = await fetch('https://api.notion.com/v1/pages', {
+      method: 'POST', headers,
+      body: JSON.stringify({ parent: { database_id: env.NOTION_STICKY_DB_ID }, properties }),
+    });
+  }
+
+  if (!notionRes.ok) {
+    const err = await notionRes.json();
+    return reply({ error: 'Notion API error', code: err.code, message: err.message }, notionRes.status);
+  }
+
+  const result = await notionRes.json();
+  return reply({ ok: true, page_id: result.id, action: existingPage ? 'updated' : 'created' });
+}
+
+// ── Sticky delete: archive a note ───────────────────────────────
+async function handleStickyDelete(data, env) {
+  if (!env.NOTION_TOKEN || !env.NOTION_STICKY_DB_ID) {
+    return reply({ error: 'Sticky Notes DB not configured' }, 500);
+  }
+
+  const { noteId } = data;
+  if (!noteId) {
+    return reply({ error: 'Missing "noteId"' }, 400);
+  }
+
+  const headers = notionHeaders(env);
+
+  // Find the note
+  const queryRes = await fetch(
+    `https://api.notion.com/v1/databases/${env.NOTION_STICKY_DB_ID}/query`,
+    {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        filter: { property: 'NoteId', title: { equals: noteId } },
+        page_size: 1,
+      }),
+    },
+  );
+
+  if (!queryRes.ok) {
+    const err = await queryRes.json();
+    return reply({ error: 'Notion query failed', message: err.message }, queryRes.status);
+  }
+
+  const queryResult = await queryRes.json();
+  const existingPage = queryResult.results[0];
+
+  if (!existingPage) {
+    return reply({ ok: true, action: 'not_found' });
+  }
+
+  // Soft-delete: set Archived = true
+  const notionRes = await fetch(`https://api.notion.com/v1/pages/${existingPage.id}`, {
+    method: 'PATCH', headers,
+    body: JSON.stringify({ properties: { 'Archived': { checkbox: true } } }),
+  });
+
+  if (!notionRes.ok) {
+    const err = await notionRes.json();
+    return reply({ error: 'Notion API error', code: err.code, message: err.message }, notionRes.status);
+  }
+
+  return reply({ ok: true, action: 'archived' });
 }
 
 // ── Helpers ──────────────────────────────────────────────────────

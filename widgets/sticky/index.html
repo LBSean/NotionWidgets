@@ -170,11 +170,50 @@
     html[data-theme="light"] .icon-btn              { color: #a16207; }
     html[data-theme="light"] .tab                   { color: #a16207; }
     html[data-theme="light"] .tab-add               { color: #a16207; }
+
+    /* ── Sync indicator ────────────────────────────── */
+    .sync-indicator { display:inline-block; font-size:0.55rem; width:1em; text-align:center; vertical-align:middle; margin-left:4px; }
+    .sync-indicator.syncing { color:#a16207; animation:spin 1s linear infinite; }
+    .sync-indicator.synced  { color:#4ade80; }
+    .sync-indicator.error   { color:#e74c3c; font-weight:700; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ── Settings panel ────────────────────────────── */
+    .settings-panel { position:fixed; inset:0; background:#fefce8; padding:1rem 1.2rem; display:flex; flex-direction:column; gap:0.8rem; transform:translateY(100%); transition:transform 0.25s ease; z-index:10; overflow-y:auto; }
+    .settings-panel.open { transform:translateY(0); }
+    .settings-title { font-size:0.82rem; font-weight:700; color:#92400e; }
+    .sync-field { display:flex; flex-direction:column; gap:0.3rem; }
+    .sync-field label { font-size:0.62rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#a16207; }
+    .sync-field input { padding:0.4em 0.6em; border:1.5px solid rgba(161,98,7,0.2); border-radius:6px; font-size:0.78rem; font-family:inherit; color:#1c1917; background:transparent; outline:none; width:100%; box-sizing:border-box; }
+    .sync-field input:focus { border-color:#d97706; }
+    .webhook-row { display:flex; gap:0.4rem; align-items:flex-end; }
+    .webhook-row input { flex:1; }
+    .btn-test { padding:0.4em 0.8em; background:#d97706; color:#fff; border:none; border-radius:6px; font-size:0.72rem; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .btn-test:hover { opacity:0.85; }
+    .test-result { font-size:0.65rem; min-height:1.1em; color:#a16207; }
+    .sync-hint { font-size:0.6rem; color:#a16207; opacity:0.7; }
+    .settings-actions { display:flex; justify-content:space-between; align-items:center; margin-top:auto; padding-top:0.3rem; }
+    .btn-save-settings { padding:0.4em 1em; background:#d97706; color:#fff; border:none; border-radius:6px; font-size:0.78rem; font-weight:600; cursor:pointer; }
+    .btn-save-settings:hover { opacity:0.85; }
+    .btn-cancel-settings { background:none; border:none; cursor:pointer; color:#a16207; font-size:0.78rem; }
+
+    @media (prefers-color-scheme:dark) {
+      .settings-panel { background:#2a270f; }
+      .sync-field input { color:#e8e3c0; border-color:rgba(196,168,58,0.25); }
+      .sync-field label { color:#c4a83a; }
+      .settings-title { color:#e8e3c0; }
+      .test-result, .sync-hint { color:#c4a83a; }
+    }
+    html[data-theme="dark"] .settings-panel { background:#2a270f; }
+    html[data-theme="dark"] .sync-field input { color:#e8e3c0; }
+    html[data-theme="dark"] .settings-title { color:#e8e3c0; }
+    html[data-theme="light"] .settings-panel { background:#fefce8; }
   </style>
 </head>
 <body>
 
   <div class="widget-bar">
+    <button id="gearBtn" title="Settings">⚙</button>
     <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
       <span class="theme-switch__icon">☀</span>
       <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
@@ -192,6 +231,25 @@
     <span class="saved-dot" id="savedDot"></span>
     <button class="icon-btn" id="clearBtn" title="Clear note">×</button>
     <span class="word-count" id="wordCount"></span>
+    <span id="syncStatus" class="sync-indicator"></span>
+  </div>
+
+  <!-- Settings panel -->
+  <div class="settings-panel" id="settingsPanel">
+    <span class="settings-title">Sync Settings</span>
+    <div class="sync-field">
+      <label>Worker URL</label>
+      <div class="webhook-row">
+        <input type="url" id="syncUrlInput" placeholder="https://your-worker.workers.dev" autocomplete="off" />
+        <button class="btn-test" id="testSyncBtn">Test</button>
+      </div>
+      <div class="test-result" id="testResult"></div>
+      <span class="sync-hint">Enter your Cloudflare Worker URL to sync notes across devices.</span>
+    </div>
+    <div class="settings-actions">
+      <button class="btn-cancel-settings" id="cancelSettingsBtn">Cancel</button>
+      <button class="btn-save-settings" id="saveSettingsBtn">Save</button>
+    </div>
   </div>
 
   <script>
@@ -294,6 +352,7 @@
       saveStore();
       loadActive();
       renderTabs();
+      pushNoteToNotion(n.id, n.title, n.content);
 
       // Auto-start renaming the new tab
       const newTab = tabBar.querySelector('.tab.active');
@@ -306,6 +365,7 @@
       saveStore();
       loadActive();
       renderTabs();
+      deleteNoteFromNotion(id);
     }
 
     function startRename(tabEl, note) {
@@ -321,6 +381,7 @@
         note.title = input.value.trim() || 'Note';
         saveStore();
         renderTabs();
+        pushNoteToNotion(note.id, note.title, note.content);
       };
 
       input.addEventListener('blur', commit);
@@ -344,6 +405,8 @@
       saveCurrent();
       saveStore();
       flashSaved();
+      const note = getActive();
+      pushNoteToNotion(note.id, note.title, note.content);
     }
 
     function flashSaved() {
@@ -383,11 +446,125 @@
       clearBtn.classList.remove('danger');
     }
 
+    // ── Sync ─────────────────────────────────────────
+    let syncUrl   = localStorage.getItem('sticky-sync-url') || '';
+    let syncState = 'idle';
+
+    function renderSyncIndicator() {
+      const el = document.getElementById('syncStatus');
+      if (!el) return;
+      if (!syncUrl) { el.className = 'sync-indicator'; el.textContent = ''; return; }
+      if (syncState === 'syncing') { el.className = 'sync-indicator syncing'; el.textContent = '↻'; }
+      else if (syncState === 'synced') { el.className = 'sync-indicator synced'; el.textContent = '✓'; }
+      else if (syncState === 'error') { el.className = 'sync-indicator error'; el.textContent = '!'; }
+      else { el.className = 'sync-indicator'; el.textContent = ''; }
+    }
+
+    async function syncFromNotion() {
+      if (!syncUrl) return;
+      syncState = 'syncing'; renderSyncIndicator();
+      try {
+        const res = await fetch(syncUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'sticky-sync' }),
+        });
+        const json = await res.json();
+        if (json.ok && json.notes) {
+          const localIds = new Set(store.notes.map(n => n.id));
+          // Add remote notes not in local
+          for (const rn of json.notes) {
+            if (!localIds.has(rn.id)) {
+              store.notes.push({ id: rn.id, title: rn.title || 'Note', content: rn.content || '' });
+            } else {
+              // Update local from remote (remote wins for content)
+              const local = store.notes.find(n => n.id === rn.id);
+              if (local) {
+                local.title = rn.title || local.title;
+                local.content = rn.content ?? local.content;
+              }
+            }
+          }
+          saveStore();
+          renderTabs();
+          loadActive();
+        }
+        syncState = 'synced';
+      } catch { syncState = 'error'; }
+      renderSyncIndicator();
+    }
+
+    async function pushNoteToNotion(noteId, title, content) {
+      if (!syncUrl) return;
+      syncState = 'syncing'; renderSyncIndicator();
+      try {
+        await fetch(syncUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'sticky-save', noteId, title, content }),
+        });
+        syncState = 'synced';
+      } catch { syncState = 'error'; }
+      renderSyncIndicator();
+    }
+
+    async function deleteNoteFromNotion(noteId) {
+      if (!syncUrl) return;
+      syncState = 'syncing'; renderSyncIndicator();
+      try {
+        await fetch(syncUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'sticky-delete', noteId }),
+        });
+        syncState = 'synced';
+      } catch { syncState = 'error'; }
+      renderSyncIndicator();
+    }
+
+    // ── Settings handlers ────────────────────────────
+    document.getElementById('gearBtn').addEventListener('click', () => {
+      document.getElementById('syncUrlInput').value = syncUrl;
+      document.getElementById('testResult').textContent = '';
+      document.getElementById('settingsPanel').classList.add('open');
+    });
+    document.getElementById('cancelSettingsBtn').addEventListener('click', () => {
+      document.getElementById('settingsPanel').classList.remove('open');
+    });
+    document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+      syncUrl = document.getElementById('syncUrlInput').value.trim();
+      localStorage.setItem('sticky-sync-url', syncUrl);
+      document.getElementById('settingsPanel').classList.remove('open');
+      if (syncUrl) syncFromNotion();
+      renderSyncIndicator();
+    });
+    document.getElementById('testSyncBtn').addEventListener('click', async () => {
+      const url = document.getElementById('syncUrlInput').value.trim();
+      const res_el = document.getElementById('testResult');
+      if (!url) { res_el.textContent = 'Enter a URL first'; return; }
+      res_el.textContent = 'Testing…';
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'sticky-sync' }),
+        });
+        const j = await r.json();
+        res_el.textContent = j.ok ? '✓ Connected — ' + (j.notes?.length || 0) + ' notes found' : '✗ ' + (j.error || 'Unknown error');
+        res_el.style.color = j.ok ? '#4ade80' : '#e74c3c';
+      } catch (e) {
+        res_el.textContent = '✗ ' + e.message;
+        res_el.style.color = '#e74c3c';
+      }
+    });
+
     // ── Init ────────────────────────────────────────
     loadStore();
     renderTabs();
     loadActive();
     addBtn.addEventListener('click', addNote);
+    renderSyncIndicator();
+    if (syncUrl) syncFromNotion();
   </script>
 </body>
 </html>

@@ -541,7 +541,14 @@
 
   <!-- Widget control bar -->
   <div class="widget-bar">
+    <button id="refreshSyncBtn" title="Sync from Notion" aria-label="Sync">↻</button>
+    <div class="hm-views" id="viewBtns">
+      <button data-view="year" class="active">Y</button>
+      <button data-view="month">M</button>
+      <button data-view="week">W</button>
+    </div>
     <button id="gearBtn" title="Settings" aria-label="Settings">⚙</button>
+    <span id="syncStatus" class="sync-indicator"></span>
     <button class="theme-switch" onclick="__toggleTheme()" title="Toggle theme" aria-label="Toggle theme">
       <span class="theme-switch__icon">☀</span>
       <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
@@ -787,11 +794,48 @@
       return Math.round(a / dim * 100);
     }
 
+    // ─── Category sync (labels/colors) ─────────────
+    async function pushCfgToNotion() {
+      if (!syncUrl) return;
+      try {
+        await fetch(syncUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'config-save', key: 'heatmap', data: cfg }),
+        });
+      } catch {}
+    }
+
+    async function syncCfgFromNotion() {
+      if (!syncUrl) return;
+      try {
+        const res = await fetch(syncUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'config-load', key: 'heatmap' }),
+        });
+        const json = await res.json();
+        if (json.ok && json.data && json.data.categories) {
+          cfg = json.data;
+          saveCfg(cfg);
+          activeFilters = new Set(cfg.categories.map(c => c.id));
+        }
+      } catch {}
+    }
+
     // ─── Rendering ──────────────────────────────────
+    function updateViewBtns() {
+      document.querySelectorAll('#viewBtns button').forEach(b => {
+        b.classList.toggle('active', b.dataset.view === viewMode);
+      });
+    }
+
     function render() {
       if (viewMode === 'year') renderYear();
       else if (viewMode === 'month') renderMonth();
       else renderWeek();
+      updateViewBtns();
+      renderSyncIndicator();
     }
 
     function headerHTML() {
@@ -805,14 +849,9 @@
         nav = `<button data-act="pw">‹</button><span class="hm-nav-label">${MONTHS[ws.getMonth()]} ${ws.getDate()} – ${MONTHS[we.getMonth()]} ${we.getDate()}</span><button data-act="nw">›</button>`;
       }
       return `<div class="hm-header">
-        <div class="hm-title">${viewYear} Activity <span id="syncStatus" class="sync-indicator"></span></div>
+        <div class="hm-title">${viewYear} Activity</div>
         <div class="hm-controls">
           <div class="hm-nav">${nav}</div>
-          <div class="hm-views">
-            <button data-view="year" class="${viewMode==='year'?'active':''}">Y</button>
-            <button data-view="month" class="${viewMode==='month'?'active':''}">M</button>
-            <button data-view="week" class="${viewMode==='week'?'active':''}">W</button>
-          </div>
         </div>
       </div>`;
     }
@@ -1034,17 +1073,6 @@
         openLog(cell.dataset.date);
         return;
       }
-      // View toggle
-      const vb = e.target.closest('[data-view]');
-      if (vb) {
-        const m = vb.dataset.view;
-        if (m !== viewMode) {
-          viewMode = m;
-          if (m === 'week' && !viewWeekStart) viewWeekStart = getMondayOfWeek(new Date());
-          render();
-        }
-        return;
-      }
       // Navigation
       const act = e.target.closest('[data-act]')?.dataset.act;
       if (act === 'py') { viewYear--; render(); if (syncUrl) syncFromNotion(viewYear); }
@@ -1080,6 +1108,25 @@
     document.getElementById('dlgDone').addEventListener('click', () => { logDialog.close(); render(); });
     logDialog.addEventListener('click', e => { if (e.target === logDialog) { logDialog.close(); render(); } });
 
+    // View toggle (now in widget-bar)
+    document.getElementById('viewBtns').addEventListener('click', e => {
+      const btn = e.target.closest('[data-view]');
+      if (!btn) return;
+      const m = btn.dataset.view;
+      if (m !== viewMode) {
+        viewMode = m;
+        if (m === 'week' && !viewWeekStart) viewWeekStart = getMondayOfWeek(new Date());
+        render();
+      }
+    });
+
+    // Refresh/sync button
+    document.getElementById('refreshSyncBtn').addEventListener('click', () => {
+      if (syncUrl) {
+        syncCfgFromNotion().then(() => syncFromNotion(viewYear));
+      }
+    });
+
     // Settings events
     document.getElementById('gearBtn').addEventListener('click', openSettings);
     document.getElementById('cancelSettingsBtn').addEventListener('click', closeSettings);
@@ -1102,7 +1149,7 @@
       activeFilters = new Set(cfg.categories.map(c => c.id));
       closeSettings();
       render();
-      if (syncUrl) syncFromNotion(viewYear);
+      if (syncUrl) { pushCfgToNotion(); syncFromNotion(viewYear); }
     });
     document.getElementById('catList').addEventListener('click', e => {
       const btn = e.target.closest('.cat-del');
@@ -1150,7 +1197,12 @@
     try { syncUrl = localStorage.getItem('habits-sync-url') || ''; } catch {}
     activeFilters = new Set(cfg.categories.map(c => c.id));
     render();
-    if (syncUrl) syncFromNotion(viewYear);
+    if (syncUrl) {
+      syncCfgFromNotion().then(() => {
+        render(); // re-render with synced categories
+        syncFromNotion(viewYear);
+      });
+    }
   })();
   </script>
 </body>

@@ -16,3 +16,9 @@ compatibility_date  = "2024-09-01"
 # NOTION_DB_ID         → Pomodoro database ID (32-char from URL)
 #
 # NOTION_HABITS_DB_ID  → Habit Tracker database ID (32-char from URL)
+#
+#   wrangler secret put NOTION_WIDGET_DATA_DB_ID
+#   wrangler secret put NOTION_STICKY_DB_ID
+#
+# NOTION_WIDGET_DATA_DB_ID → Widget Data database ID (shared config for matrix/countdown/news/weather)
+# NOTION_STICKY_DB_ID      → Sticky Notes database ID (one row per note)

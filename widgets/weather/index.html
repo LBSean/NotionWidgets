@@ -229,11 +229,28 @@
 
     html[data-theme="dark"]  .settings-panel { background: #191a1f; }
     html[data-theme="light"] .settings-panel { background: #fff; }
+
+    /* ── Sync ──────────────────────────────────────── */
+    .sync-indicator { display:inline-block; font-size:0.55rem; width:1em; text-align:center; vertical-align:middle; margin-left:4px; }
+    .sync-indicator.syncing { color:var(--color-text-muted); animation:spin 1s linear infinite; }
+    .sync-indicator.synced  { color:#40c463; }
+    .sync-indicator.error   { color:#e74c3c; font-weight:700; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .sync-section { border-top:1px solid var(--color-border); padding-top:0.6rem; margin-top:0.2rem; }
+    .sync-section-title { font-size:var(--font-size-xs); font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-muted); margin-bottom:0.35rem; }
+    .sync-field input[type="url"] { padding:0.35rem 0.6rem; border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-surface); color:var(--color-text); font-size:var(--font-size-xs); font-family:inherit; outline:none; width:100%; box-sizing:border-box; }
+    .sync-field input[type="url"]:focus { border-color:var(--color-accent); }
+    .webhook-row { display:flex; gap:0.4rem; align-items:flex-end; }
+    .webhook-row input { flex:1; }
+    .btn-test { padding:0.3em 0.7em; background:var(--color-accent); color:#fff; border:none; border-radius:var(--radius-sm); font-size:var(--font-size-xs); font-weight:600; cursor:pointer; white-space:nowrap; }
+    .test-result { font-size:var(--font-size-xs); min-height:1em; color:var(--color-text-muted); }
+    .sync-hint { font-size:0.58rem; color:var(--color-text-muted); opacity:0.7; }
   </style>
 </head>
 <body>
 
   <div class="widget-bar">
+    <span id="syncStatus" class="sync-indicator"></span>
     <button id="refreshBtn" title="Refresh">↺</button>
     <button id="gearBtn" title="Settings">⚙</button>
     <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
@@ -290,6 +307,18 @@
       <div class="slider-row">
         <input type="range" id="daysSlider" min="1" max="7" step="1" value="5" />
         <span class="slider-val" id="daysVal">5</span>
+      </div>
+    </div>
+
+    <div class="sync-section">
+      <div class="sync-section-title">Notion Sync</div>
+      <div class="sync-field">
+        <div class="webhook-row">
+          <input type="url" id="syncUrlInput" placeholder="https://your-worker.workers.dev" autocomplete="off" />
+          <button class="btn-test" id="testSyncBtn">Test</button>
+        </div>
+        <div class="test-result" id="testResult"></div>
+        <span class="sync-hint">Sync weather settings across devices.</span>
       </div>
     </div>
 
@@ -413,11 +442,21 @@
 
     // ── Settings panel ─────────────────────────────────────────
     const panel = document.getElementById('settingsPanel');
-    const openSettings  = () => panel.classList.add('open');
+    const openSettings = () => {
+      document.getElementById('syncUrlInput').value = syncUrl;
+      document.getElementById('testResult').textContent = '';
+      panel.classList.add('open');
+    };
     const closeSettings = () => panel.classList.remove('open');
 
     document.getElementById('gearBtn').addEventListener('click', openSettings);
-    document.getElementById('closeBtn').addEventListener('click', closeSettings);
+    document.getElementById('closeBtn').addEventListener('click', () => {
+      // Save sync URL on close
+      syncUrl = document.getElementById('syncUrlInput').value.trim();
+      localStorage.setItem('weather-sync-url', syncUrl);
+      renderSyncIndicator();
+      closeSettings();
+    });
     document.getElementById('refreshBtn').addEventListener('click', fetchWeather);
 
     // Unit toggle
@@ -429,11 +468,13 @@
     document.getElementById('btnC').addEventListener('click', () => {
       setUnit('C');
       saveCfg();
+      pushToNotion();
       if (cfg.lat != null) fetchWeather();
     });
     document.getElementById('btnF').addEventListener('click', () => {
       setUnit('F');
       saveCfg();
+      pushToNotion();
       if (cfg.lat != null) fetchWeather();
     });
 
@@ -444,6 +485,7 @@
       cfg.days = parseInt(slider.value, 10);
       daysVal.textContent = cfg.days;
       saveCfg();
+      pushToNotion();
       if (cfg.lat != null) fetchWeather();
     });
 
@@ -459,6 +501,7 @@
         cfg.lat  = result.latitude;
         cfg.lon  = result.longitude;
         saveCfg();
+        pushToNotion();
         closeSettings();
         fetchWeather();
       } catch (err) {
@@ -472,19 +515,91 @@
       if (e.key === 'Enter') doSearch();
     });
 
+    // ── Sync ─────────────────────────────────────────────────
+    let syncUrl   = localStorage.getItem('weather-sync-url') || '';
+    let syncState = 'idle';
+
+    function renderSyncIndicator() {
+      const el = document.getElementById('syncStatus');
+      if (!el) return;
+      if (!syncUrl) { el.className = 'sync-indicator'; el.textContent = ''; return; }
+      if (syncState === 'syncing') { el.className = 'sync-indicator syncing'; el.textContent = '↻'; }
+      else if (syncState === 'synced') { el.className = 'sync-indicator synced'; el.textContent = '✓'; }
+      else if (syncState === 'error') { el.className = 'sync-indicator error'; el.textContent = '!'; }
+      else { el.className = 'sync-indicator'; el.textContent = ''; }
+    }
+
+    async function syncFromNotion() {
+      if (!syncUrl) return;
+      syncState = 'syncing'; renderSyncIndicator();
+      try {
+        const res = await fetch(syncUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'config-load', key: 'weather' }),
+        });
+        const json = await res.json();
+        if (json.ok && json.data) {
+          cfg = { ...cfg, ...json.data };
+          saveCfg();
+          setUnit(cfg.unit);
+          slider.value = cfg.days;
+          daysVal.textContent = cfg.days;
+        }
+        syncState = 'synced';
+      } catch { syncState = 'error'; }
+      renderSyncIndicator();
+    }
+
+    async function pushToNotion() {
+      if (!syncUrl) return;
+      syncState = 'syncing'; renderSyncIndicator();
+      try {
+        await fetch(syncUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'config-save', key: 'weather', data: cfg }),
+        });
+        syncState = 'synced';
+      } catch { syncState = 'error'; }
+      renderSyncIndicator();
+    }
+
+    document.getElementById('testSyncBtn').addEventListener('click', async () => {
+      const url = document.getElementById('syncUrlInput').value.trim();
+      const rEl = document.getElementById('testResult');
+      if (!url) { rEl.textContent = 'Enter a URL first'; return; }
+      rEl.textContent = 'Testing…';
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'config-load', key: 'weather' }),
+        });
+        const j = await r.json();
+        rEl.textContent = j.ok ? '✓ Connected' + (j.data ? ' — config found' : ' — no data yet') : '✗ ' + (j.error || 'Error');
+        rEl.style.color = j.ok ? '#40c463' : '#e74c3c';
+      } catch (e) { rEl.textContent = '✗ ' + e.message; rEl.style.color = '#e74c3c'; }
+    });
+
     // ── Init ──────────────────────────────────────────────────
     loadCfg();
     setUnit(cfg.unit);
     slider.value    = cfg.days;
     daysVal.textContent = cfg.days;
+    renderSyncIndicator();
 
-    if (cfg.lat != null) {
-      document.getElementById('cityInput').value = cfg.city;
-      fetchWeather();
-    } else {
-      showStatus('Set your city in settings ⚙');
-      openSettings();
+    async function initWeather() {
+      if (syncUrl) await syncFromNotion();
+      if (cfg.lat != null) {
+        document.getElementById('cityInput').value = cfg.city;
+        fetchWeather();
+      } else {
+        showStatus('Set your city in settings ⚙');
+        openSettings();
+      }
     }
+    initWeather();
   </script>
 </body>
 </html>
