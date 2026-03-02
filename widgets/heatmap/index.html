@@ -364,18 +364,58 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .dlg-slider {
-      width: 72px;
-      height: 4px;
+    .dlg-toggle {
+      position: relative;
+      width: 34px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    .dlg-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+    .dlg-toggle-track {
+      position: absolute;
+      inset: 0;
+      border-radius: 99px;
+      background: #ddd;
       cursor: pointer;
+      transition: background 0.2s;
     }
-    .dlg-pct {
-      font-size: 0.6rem;
-      width: 28px;
-      text-align: right;
+    .dlg-toggle-track::after {
+      content: '';
+      position: absolute;
+      left: 3px;
+      top: 3px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+    .dlg-toggle input:checked + .dlg-toggle-track::after {
+      transform: translateX(14px);
+    }
+    html[data-theme="dark"] .dlg-toggle-track { background: #444455; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme]) .dlg-toggle-track { background: #444455; }
+    }
+    .dlg-manage {
+      display: block;
+      text-align: center;
+      font-size: 0.58rem;
       color: var(--color-text-muted);
-      font-variant-numeric: tabular-nums;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0.2rem 0 0;
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
+    .dlg-manage:hover { color: var(--color-text); }
     .dlg-done {
       margin-top: 0.25rem;
       padding: 0.32rem;
@@ -599,14 +639,14 @@
 
     function getIntensity(dayData) {
       if (!dayData || typeof dayData !== 'object') return 0;
-      const vals = cfg.categories
-        .filter(c => activeFilters.has(c.id) && dayData[c.id] > 0)
-        .map(c => dayData[c.id]);
-      if (!vals.length) return 0;
-      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-      if (avg <= 25) return 1;
-      if (avg <= 50) return 2;
-      if (avg <= 75) return 3;
+      const activeCats = cfg.categories.filter(c => activeFilters.has(c.id));
+      if (!activeCats.length) return 0;
+      const doneCount = activeCats.filter(c => (dayData[c.id] || 0) > 0).length;
+      if (doneCount === 0) return 0;
+      const pct = doneCount / activeCats.length * 100;
+      if (pct <= 25) return 1;
+      if (pct <= 50) return 2;
+      if (pct <= 75) return 3;
       return 4;
     }
 
@@ -775,11 +815,11 @@
         const d = new Date(viewWeekStart); d.setDate(d.getDate() + i);
         const k = iso(d), dd = data[k] || {};
         const cats = cfg.categories.filter(c => activeFilters.has(c.id));
-        let avg = 0;
-        if (cats.length) avg = Math.round(cats.reduce((s, c) => s + (dd[c.id] || 0), 0) / cats.length);
+        const doneCount = cats.filter(c => (dd[c.id] || 0) > 0).length;
+        const avg = cats.length ? Math.round(doneCount / cats.length * 100) : 0;
         const chips = cats.map(c => {
-          const p = dd[c.id] || 0;
-          return `<span class="week-chip${p>0?' done':''}" style="${p>0?'background:'+c.color+';border-color:'+c.color:''}">${c.name} ${p}%</span>`;
+          const done = (dd[c.id] || 0) > 0;
+          return `<span class="week-chip${done?' done':''}" style="${done?'background:'+c.color+';border-color:'+c.color:''}">${c.name}${done?' \u2713':''}</span>`;
         }).join('');
         const todayCls = isToday(d) ? ' today-row' : '';
         rows += `<div class="week-row${todayCls}" data-date="${k}">
@@ -803,29 +843,43 @@
       box.innerHTML = '';
 
       cfg.categories.forEach(cat => {
-        const pct = dd[cat.id] || 0;
+        const done = (dd[cat.id] || 0) > 0;
         const row = document.createElement('div');
         row.className = 'dlg-row';
         row.innerHTML =
           `<span class="dlg-dot" style="background:${cat.color}"></span>` +
           `<span class="dlg-name">${cat.name}</span>` +
-          `<input class="dlg-slider" type="range" min="0" max="100" step="10" value="${pct}" style="accent-color:${cat.color}">` +
-          `<span class="dlg-pct">${pct}%</span>`;
+          `<label class="dlg-toggle">` +
+            `<input type="checkbox"${done ? ' checked' : ''}>` +
+            `<span class="dlg-toggle-track" style="${done ? 'background:' + cat.color : ''}"></span>` +
+          `</label>`;
         box.appendChild(row);
 
-        const slider = row.querySelector('input');
-        const label  = row.querySelector('.dlg-pct');
-        slider.addEventListener('input', () => {
-          const v = +slider.value;
-          label.textContent = v + '%';
+        const cb    = row.querySelector('input');
+        const track = row.querySelector('.dlg-toggle-track');
+        cb.addEventListener('change', () => {
           const d = loadData(yr);
           if (!d[dateKey]) d[dateKey] = {};
-          if (v > 0) d[dateKey][cat.id] = v;
-          else delete d[dateKey][cat.id];
+          if (cb.checked) {
+            d[dateKey][cat.id] = 100;
+            track.style.background = cat.color;
+          } else {
+            delete d[dateKey][cat.id];
+            track.style.background = '';
+          }
           if (d[dateKey] && !Object.keys(d[dateKey]).length) delete d[dateKey];
           saveData(yr, d);
         });
       });
+
+      const manageBtn = document.createElement('button');
+      manageBtn.className = 'dlg-manage';
+      manageBtn.textContent = 'Manage categories\u2026';
+      manageBtn.addEventListener('click', () => {
+        logDialog.close();
+        openSettings();
+      });
+      box.appendChild(manageBtn);
 
       logDialog.showModal();
     }
@@ -859,10 +913,14 @@
       const data = loadData(viewYear), dd = data[dateKey], dt = parseDate(dateKey);
       let html = `<b>${MONTH_FULL[dt.getMonth()]} ${dt.getDate()}</b>`;
       if (dd && typeof dd === 'object') {
-        const items = cfg.categories.filter(c => dd[c.id] > 0);
-        html += items.length
-          ? '<br>' + items.map(c => `${c.name}: ${dd[c.id]}%`).join(', ')
-          : '<br>No activity';
+        const total = cfg.categories.length;
+        const items = cfg.categories.filter(c => (dd[c.id] || 0) > 0);
+        if (items.length) {
+          html += `<br>${items.length}/${total} done`;
+          html += '<br>' + items.map(c => c.name).join(', ');
+        } else {
+          html += '<br>No activity';
+        }
       } else html += '<br>No activity';
       tooltip.innerHTML = html;
       const r = cell.getBoundingClientRect();
