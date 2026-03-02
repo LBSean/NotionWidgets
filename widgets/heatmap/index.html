@@ -516,6 +516,25 @@
       flex-wrap: wrap;
       gap: 0.3rem;
     }
+    /* ── Sync indicator ── */
+    .sync-indicator { display: inline-block; font-size: 0.55rem; width: 1em; text-align: center; vertical-align: middle; margin-left: 4px; }
+    .sync-indicator.syncing { color: var(--color-text-muted); animation: spin 1s linear infinite; }
+    .sync-indicator.synced  { color: #40c463; }
+    .sync-indicator.error   { color: #e74c3c; font-weight: 700; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    /* ── Sync settings ── */
+    .sync-hint { font-size: 0.6rem; color: var(--color-text-muted); line-height: 1.5; margin-bottom: 0.4rem; }
+    .sync-hint code { background: var(--color-border); padding: 1px 4px; border-radius: 3px; font-size: 0.55rem; }
+    .sync-field { display: flex; flex-direction: column; gap: 0.25rem; }
+    .sync-field label { font-size: 0.62rem; font-weight: 500; color: var(--color-text-muted); }
+    .webhook-row { display: flex; gap: 0.35rem; align-items: center; }
+    .webhook-row input { flex: 1; font-size: 0.65rem; padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 4px; background: transparent; color: var(--color-text); }
+    .btn-test { flex-shrink: 0; padding: 4px 8px; background: var(--color-border); color: var(--color-text); border: 1px solid var(--color-border); border-radius: 4px; font-size: 0.6rem; font-weight: 600; cursor: pointer; }
+    .btn-test:hover { opacity: 0.75; }
+    .btn-test:disabled { opacity: 0.4; cursor: not-allowed; }
+    .test-result { font-size: 0.58rem; min-height: 1em; }
+    .test-result.ok  { color: #40c463; }
+    .test-result.err { color: #e74c3c; }
   </style>
 </head>
 <body>
@@ -538,6 +557,16 @@
     <h2>Categories</h2>
     <div class="cat-list" id="catList"></div>
     <button class="settings-btn secondary" id="addCatBtn">+ Add Category</button>
+    <h2 style="margin-top:0.5rem">Notion Sync</h2>
+    <p class="sync-hint">Paste your Cloudflare Worker URL to sync habits with Notion.</p>
+    <div class="sync-field">
+      <label for="syncUrlInput">Worker URL</label>
+      <div class="webhook-row">
+        <input type="url" id="syncUrlInput" placeholder="https://notion-widgets-webhook.....workers.dev">
+        <button class="btn-test" id="testSyncBtn" type="button">Test</button>
+      </div>
+      <div class="test-result" id="syncTestResult"></div>
+    </div>
     <div class="settings-actions">
       <button class="settings-btn primary" id="saveSettingsBtn">Save</button>
       <button class="settings-btn secondary" id="cancelSettingsBtn">Cancel</button>
@@ -576,6 +605,7 @@
     let cfg, viewMode = 'year', viewYear = new Date().getFullYear();
     let viewMonth = new Date().getMonth(), viewWeekStart = null;
     let activeFilters = new Set();
+    let syncUrl = '', syncState = 'idle';
 
     // ─── DOM refs ───────────────────────────────────
     const root          = document.getElementById('root');
@@ -613,6 +643,69 @@
           localStorage.removeItem('heatmap-' + y);
         } catch {}
       }
+    }
+
+    // ─── Notion Sync ──────────────────────────────────
+    function renderSyncIndicator() {
+      const el = document.getElementById('syncStatus');
+      if (!el) return;
+      if (!syncUrl) { el.textContent = ''; el.className = 'sync-indicator'; return; }
+      if (syncState === 'syncing')    { el.textContent = '\u21BB'; el.title = 'Syncing\u2026'; el.className = 'sync-indicator syncing'; }
+      else if (syncState === 'synced') { el.textContent = '\u2713'; el.title = 'Synced'; el.className = 'sync-indicator synced'; }
+      else if (syncState === 'error')  { el.textContent = '!'; el.title = 'Sync error \u2014 check console'; el.className = 'sync-indicator error'; }
+      else { el.textContent = ''; el.className = 'sync-indicator'; }
+    }
+
+    async function syncFromNotion(year) {
+      if (!syncUrl) return;
+      syncState = 'syncing'; renderSyncIndicator();
+      try {
+        const res = await fetch(syncUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'habits-sync', year }),
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.message || json.error || 'Sync failed');
+
+        const local = loadData(year);
+        const remote = json.entries || {};
+        const merged = { ...local, ...remote };
+        for (const [k, v] of Object.entries(merged)) {
+          if (!v || typeof v !== 'object' || Object.keys(v).length === 0) delete merged[k];
+        }
+        saveData(year, merged);
+        syncState = 'synced';
+      } catch (err) {
+        console.warn('Habits sync failed:', err);
+        syncState = 'error';
+      }
+      renderSyncIndicator();
+      render();
+    }
+
+    async function pushToNotion(dateKey, dayData) {
+      if (!syncUrl) return;
+      syncState = 'syncing'; renderSyncIndicator();
+      const summary = cfg.categories
+        .filter(c => dayData && dayData[c.id] > 0)
+        .map(c => c.name).join(', ');
+      try {
+        const res = await fetch(syncUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'habits-save', date: dateKey, data: dayData || {}, summary }),
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.message || json.error);
+        syncState = 'synced';
+      } catch (err) {
+        console.warn('Habits push failed:', err);
+        syncState = 'error';
+      }
+      renderSyncIndicator();
     }
 
     // ─── Helpers ────────────────────────────────────
@@ -712,7 +805,7 @@
         nav = `<button data-act="pw">‹</button><span class="hm-nav-label">${MONTHS[ws.getMonth()]} ${ws.getDate()} – ${MONTHS[we.getMonth()]} ${we.getDate()}</span><button data-act="nw">›</button>`;
       }
       return `<div class="hm-header">
-        <div class="hm-title">${viewYear} Activity</div>
+        <div class="hm-title">${viewYear} Activity <span id="syncStatus" class="sync-indicator"></span></div>
         <div class="hm-controls">
           <div class="hm-nav">${nav}</div>
           <div class="hm-views">
@@ -869,6 +962,7 @@
           }
           if (d[dateKey] && !Object.keys(d[dateKey]).length) delete d[dateKey];
           saveData(yr, d);
+          pushToNotion(dateKey, d[dateKey] || {});
         });
       });
 
@@ -890,6 +984,8 @@
     function openSettings() {
       tempCats = cfg.categories.map(c => ({ ...c }));
       renderCatList();
+      document.getElementById('syncUrlInput').value = syncUrl;
+      document.getElementById('syncTestResult').textContent = '';
       settingsPanel.classList.add('open');
     }
     function closeSettings() { settingsPanel.classList.remove('open'); }
@@ -951,8 +1047,8 @@
       }
       // Navigation
       const act = e.target.closest('[data-act]')?.dataset.act;
-      if (act === 'py') { viewYear--; render(); }
-      else if (act === 'ny') { viewYear++; render(); }
+      if (act === 'py') { viewYear--; render(); if (syncUrl) syncFromNotion(viewYear); }
+      else if (act === 'ny') { viewYear++; render(); if (syncUrl) syncFromNotion(viewYear); }
       else if (act === 'pm') { viewMonth--; if (viewMonth < 0) { viewMonth = 11; viewYear--; } render(); }
       else if (act === 'nm') { viewMonth++; if (viewMonth > 11) { viewMonth = 0; viewYear++; } render(); }
       else if (act === 'pw') { viewWeekStart.setDate(viewWeekStart.getDate() - 7); viewYear = viewWeekStart.getFullYear(); render(); }
@@ -1001,13 +1097,43 @@
       });
       cfg.categories = nc;
       saveCfg(cfg);
+      syncUrl = document.getElementById('syncUrlInput').value.trim();
+      try { localStorage.setItem('habits-sync-url', syncUrl); } catch {}
       activeFilters = new Set(cfg.categories.map(c => c.id));
       closeSettings();
       render();
+      if (syncUrl) syncFromNotion(viewYear);
     });
     document.getElementById('catList').addEventListener('click', e => {
       const btn = e.target.closest('.cat-del');
       if (btn) { tempCats.splice(+btn.dataset.i, 1); renderCatList(); }
+    });
+
+    // Sync test button
+    document.getElementById('testSyncBtn').addEventListener('click', async function () {
+      const url = document.getElementById('syncUrlInput').value.trim();
+      const res_el = document.getElementById('syncTestResult');
+      if (!url) { res_el.className = 'test-result err'; res_el.textContent = 'Enter a URL first'; return; }
+      this.disabled = true;
+      res_el.className = 'test-result'; res_el.textContent = 'Testing\u2026';
+      try {
+        const r = await fetch(url, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'habits-sync', year: new Date().getFullYear() }),
+        });
+        const json = await r.json().catch(() => ({}));
+        if (r.ok && json.ok) {
+          const count = json.entries ? Object.keys(json.entries).length : 0;
+          res_el.className = 'test-result ok';
+          res_el.textContent = `OK \u2014 ${count} day(s) found in Notion`;
+        } else {
+          res_el.className = 'test-result err';
+          res_el.textContent = json.message || json.error || `HTTP ${r.status}`;
+        }
+      } catch (err) {
+        res_el.className = 'test-result err'; res_el.textContent = err.message;
+      }
+      this.disabled = false;
     });
 
     // Keyboard — Enter on cell
@@ -1021,8 +1147,10 @@
     // ─── Init ───────────────────────────────────────
     cfg = loadCfg();
     migrateOldData();
+    try { syncUrl = localStorage.getItem('habits-sync-url') || ''; } catch {}
     activeFilters = new Set(cfg.categories.map(c => c.id));
     render();
+    if (syncUrl) syncFromNotion(viewYear);
   })();
   </script>
 </body>
