@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grocery List</title>
+  <link rel="stylesheet" href="../../shared/base.css" />
+  <script src="../../shared/theme.js"></script>
+
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 0.6rem;
+      gap: 0;
+      overflow: hidden;
+    }
+
+    /* ── Add input ───────────────────────────────────── */
+    .add-bar {
+      display: flex;
+      gap: 0.35rem;
+      padding: 0.3rem 0;
+      flex-shrink: 0;
+    }
+
+    .add-bar input {
+      flex: 1;
+      padding: 0.45em 0.65em;
+      border: 1.5px solid var(--color-border);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.82rem;
+      color: var(--color-text);
+      background: transparent;
+      outline: none;
+    }
+    .add-bar input:focus { border-color: var(--color-accent); }
+    .add-bar input::placeholder { color: var(--color-text-muted); opacity: 0.5; }
+
+    /* ── Item list ───────────────────────────────────── */
+    .item-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      padding: 0.15rem 0;
+    }
+
+    .grocery-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.4rem;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+    .grocery-item:hover { background: rgba(0,0,0,0.04); }
+    @media (prefers-color-scheme: dark) { .grocery-item:hover { background: rgba(255,255,255,0.05); } }
+    html[data-theme="dark"] .grocery-item:hover { background: rgba(255,255,255,0.05); }
+
+    .grocery-item.checked .item-text {
+      text-decoration: line-through;
+      opacity: 0.45;
+    }
+
+    .item-cb {
+      width: 18px;
+      height: 18px;
+      border: 1.5px solid var(--color-border);
+      border-radius: 4px;
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      color: transparent;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .grocery-item.checked .item-cb {
+      border-color: #40c463;
+      background: #40c463;
+      color: #fff;
+    }
+
+    .item-text {
+      flex: 1;
+      font-size: 0.82rem;
+      color: var(--color-text);
+      min-width: 0;
+      cursor: text;
+      word-break: break-word;
+    }
+
+    .item-edit-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 0.82rem;
+      color: var(--color-text);
+      min-width: 0;
+    }
+
+    .item-del {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--color-text-muted);
+      font-size: 0.85rem;
+      padding: 0 3px;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+    .grocery-item:hover .item-del { opacity: 0.6; }
+    .item-del:hover { color: #ef4444; opacity: 1 !important; }
+
+    /* ── Footer ──────────────────────────────────────── */
+    .list-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.35rem 0.2rem 0;
+      border-top: 1px solid var(--color-border);
+      flex-shrink: 0;
+    }
+
+    .item-count {
+      font-size: 0.62rem;
+      color: var(--color-text-muted);
+    }
+
+    .btn-clear {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--color-text-muted);
+      font-size: 0.62rem;
+      padding: 0.2em 0.4em;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+    .btn-clear:hover { color: #ef4444; }
+
+    .empty-state {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: var(--color-text-muted);
+      font-size: 0.78rem;
+      padding: 2rem;
+    }
+
+    /* ── Sync indicator ────────────────────────────── */
+    .sync-indicator { display:inline-block; font-size:0.55rem; width:1em; text-align:center; vertical-align:middle; margin-left:4px; }
+    .sync-indicator.syncing { color:var(--color-text-muted); animation:spin 1s linear infinite; }
+    .sync-indicator.synced  { color:#40c463; }
+    .sync-indicator.error   { color:#e74c3c; font-weight:700; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ── Settings panel ────────────────────────────── */
+    .settings-panel { position:fixed; inset:0; background:var(--color-bg,#fff); padding:1rem 1.2rem; display:flex; flex-direction:column; gap:0.8rem; transform:translateY(100%); transition:transform 0.25s ease; z-index:10; overflow-y:auto; }
+    .settings-panel.open { transform:translateY(0); }
+    @media (prefers-color-scheme:dark) { .settings-panel { background:#191a1f; } }
+    html[data-theme="dark"]  .settings-panel { background:#191a1f; }
+    html[data-theme="light"] .settings-panel { background:#fff; }
+
+    .settings-title { font-size:0.82rem; font-weight:700; color:var(--color-text); }
+    .sync-field { display:flex; flex-direction:column; gap:0.3rem; }
+    .sync-field label { font-size:0.62rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-muted); }
+    .sync-field input { padding:0.4em 0.6em; border:1.5px solid var(--color-border); border-radius:6px; font-size:0.78rem; font-family:inherit; color:var(--color-text); background:transparent; outline:none; width:100%; box-sizing:border-box; }
+    .sync-field input:focus { border-color:var(--color-accent); }
+    .webhook-row { display:flex; gap:0.4rem; align-items:flex-end; }
+    .webhook-row input { flex:1; }
+    .btn-test { padding:0.4em 0.8em; background:var(--color-accent); color:#fff; border:none; border-radius:6px; font-size:0.72rem; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .btn-test:hover { opacity:0.85; }
+    .test-result { font-size:0.65rem; min-height:1.1em; color:var(--color-text-muted); }
+    .sync-hint { font-size:0.6rem; color:var(--color-text-muted); opacity:0.7; }
+    .settings-actions { display:flex; justify-content:space-between; align-items:center; margin-top:auto; padding-top:0.3rem; }
+    .btn-save { padding:0.4em 1em; background:var(--color-accent); color:#fff; border:none; border-radius:6px; font-size:0.78rem; font-weight:600; cursor:pointer; }
+    .btn-cancel { background:none; border:none; cursor:pointer; color:var(--color-text-muted); font-size:0.78rem; }
+  </style>
+</head>
+<body>
+
+  <div class="widget-bar">
+    <span id="syncStatus" class="sync-indicator"></span>
+    <button id="gearBtn" title="Settings">⚙</button>
+    <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
+      <span class="theme-switch__icon">☀</span>
+      <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
+      <span class="theme-switch__icon">🌙</span>
+    </button>
+  </div>
+
+  <div class="add-bar">
+    <input type="text" id="addInput" placeholder="Add item…" autocomplete="off" />
+  </div>
+
+  <div class="item-list" id="itemList"></div>
+
+  <div class="list-footer">
+    <span class="item-count" id="itemCount"></span>
+    <button class="btn-clear" id="clearCheckedBtn">Clear checked</button>
+  </div>
+
+  <!-- Settings panel -->
+  <div class="settings-panel" id="settingsPanel">
+    <span class="settings-title">Sync Settings</span>
+    <div class="sync-field">
+      <label>Worker URL</label>
+      <div class="webhook-row">
+        <input type="url" id="syncUrlInput" placeholder="https://your-worker.workers.dev" autocomplete="off" />
+        <button class="btn-test" id="testSyncBtn">Test</button>
+      </div>
+      <div class="test-result" id="testResult"></div>
+      <span class="sync-hint">Sync your grocery list across devices via Notion.</span>
+    </div>
+    <div class="settings-actions">
+      <button class="btn-cancel" id="cancelSettingsBtn">Cancel</button>
+      <button class="btn-save" id="saveSettingsBtn">Save</button>
+    </div>
+  </div>
+
+  <script>
+    // ── State ─────────────────────────────────────────
+    const STORE_KEY = 'grocery-list';
+    let data = { items: [] };
+
+    function load() {
+      try { data = JSON.parse(localStorage.getItem(STORE_KEY)) || { items: [] }; } catch { data = { items: [] }; }
+    }
+
+    function save() {
+      localStorage.setItem(STORE_KEY, JSON.stringify(data));
+      pushToNotion();
+    }
+
+    function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+    function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // ── Render ────────────────────────────────────────
+    function render() {
+      const list = document.getElementById('itemList');
+      const countEl = document.getElementById('itemCount');
+
+      if (!data.items.length) {
+        list.innerHTML = '<div class="empty-state">List is empty. Add items above.</div>';
+        countEl.textContent = '0 items';
+        return;
+      }
+
+      // Unchecked first, then checked
+      const sorted = [...data.items].sort((a, b) => (a.checked ? 1 : 0) - (b.checked ? 1 : 0));
+
+      list.innerHTML = sorted.map(item => `
+        <div class="grocery-item${item.checked ? ' checked' : ''}" data-id="${item.id}">
+          <button class="item-cb" data-id="${item.id}">${item.checked ? '✓' : ''}</button>
+          <span class="item-text" data-id="${item.id}">${esc(item.text)}</span>
+          <button class="item-del" data-id="${item.id}" title="Remove">×</button>
+        </div>
+      `).join('');
+
+      const unchecked = data.items.filter(i => !i.checked).length;
+      const total = data.items.length;
+      countEl.textContent = `${unchecked} of ${total} remaining`;
+
+      // Bind events
+      list.querySelectorAll('.item-cb').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const item = data.items.find(i => i.id === btn.dataset.id);
+          if (item) { item.checked = !item.checked; save(); render(); }
+        });
+      });
+
+      list.querySelectorAll('.item-text').forEach(span => {
+        span.addEventListener('click', () => startEdit(span));
+      });
+
+      list.querySelectorAll('.item-del').forEach(btn => {
+        btn.addEventListener('click', () => {
+          data.items = data.items.filter(i => i.id !== btn.dataset.id);
+          save();
+          render();
+        });
+      });
+    }
+
+    // ── Inline edit ──────────────────────────────────
+    function startEdit(span) {
+      const id = span.dataset.id;
+      const item = data.items.find(i => i.id === id);
+      if (!item) return;
+
+      const input = document.createElement('input');
+      input.className = 'item-edit-input';
+      input.value = item.text;
+      span.replaceWith(input);
+      input.focus();
+      input.select();
+
+      const commit = () => {
+        const text = input.value.trim();
+        if (text) item.text = text;
+        save();
+        render();
+      };
+
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        if (e.key === 'Escape') render();
+      });
+    }
+
+    // ── Add item ─────────────────────────────────────
+    const addInput = document.getElementById('addInput');
+    addInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const text = addInput.value.trim();
+        if (!text) return;
+        data.items.push({ id: uid(), text, checked: false });
+        addInput.value = '';
+        save();
+        render();
+      }
+    });
+
+    // ── Clear checked ────────────────────────────────
+    document.getElementById('clearCheckedBtn').addEventListener('click', () => {
+      data.items = data.items.filter(i => !i.checked);
+      save();
+      render();
+    });
+
+    // ── Settings ─────────────────────────────────────
+    document.getElementById('gearBtn').addEventListener('click', () => {
+      document.getElementById('syncUrlInput').value = syncUrl;
+      document.getElementById('testResult').textContent = '';
+      document.getElementById('settingsPanel').classList.add('open');
+    });
+
+    document.getElementById('cancelSettingsBtn').addEventListener('click', () => {
+      document.getElementById('settingsPanel').classList.remove('open');
+    });
+
+    document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+      syncUrl = document.getElementById('syncUrlInput').value.trim();
+      localStorage.setItem('grocery-sync-url', syncUrl);
+      document.getElementById('settingsPanel').classList.remove('open');
+      if (syncUrl) syncFromNotion();
+      renderSyncIndicator();
+    });
+
+    // ── Sync ─────────────────────────────────────────
+    let syncUrl   = localStorage.getItem('grocery-sync-url') || '';
+    let syncState = 'idle';
+
+    function renderSyncIndicator() {
+      const el = document.getElementById('syncStatus');
+      if (!el) return;
+      if (!syncUrl) { el.className = 'sync-indicator'; el.textContent = ''; return; }
+      if (syncState === 'syncing') { el.className = 'sync-indicator syncing'; el.textContent = '↻'; }
+      else if (syncState === 'synced') { el.className = 'sync-indicator synced'; el.textContent = '✓'; }
+      else if (syncState === 'error') { el.className = 'sync-indicator error'; el.textContent = '!'; }
+      else { el.className = 'sync-indicator'; el.textContent = ''; }
+    }
+
+    async function syncFromNotion() {
+      if (!syncUrl) return;
+      syncState = 'syncing'; renderSyncIndicator();
+      try {
+        const res = await fetch(syncUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'config-load', key: 'grocery' }),
+        });
+        const json = await res.json();
+        if (json.ok && json.data && json.data.items) {
+          data = json.data;
+          localStorage.setItem(STORE_KEY, JSON.stringify(data));
+          render();
+        }
+        syncState = 'synced';
+      } catch { syncState = 'error'; }
+      renderSyncIndicator();
+    }
+
+    let _pushTimer;
+    async function pushToNotion() {
+      if (!syncUrl) return;
+      clearTimeout(_pushTimer);
+      _pushTimer = setTimeout(async () => {
+        syncState = 'syncing'; renderSyncIndicator();
+        try {
+          await fetch(syncUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'config-save', key: 'grocery', data }),
+          });
+          syncState = 'synced';
+        } catch { syncState = 'error'; }
+        renderSyncIndicator();
+      }, 500);
+    }
+
+    document.getElementById('testSyncBtn').addEventListener('click', async () => {
+      const url = document.getElementById('syncUrlInput').value.trim();
+      const rEl = document.getElementById('testResult');
+      if (!url) { rEl.textContent = 'Enter a URL first'; return; }
+      rEl.textContent = 'Testing…';
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'config-load', key: 'grocery' }),
+        });
+        const j = await r.json();
+        rEl.textContent = j.ok ? '✓ Connected' + (j.data ? ' — data found' : ' — no data yet') : '✗ ' + (j.error || 'Error');
+        rEl.style.color = j.ok ? '#40c463' : '#e74c3c';
+      } catch (e) { rEl.textContent = '✗ ' + e.message; rEl.style.color = '#e74c3c'; }
+    });
+
+    // ── Init ──────────────────────────────────────────
+    load();
+    render();
+    renderSyncIndicator();
+    if (syncUrl) syncFromNotion();
+  </script>
+</body>
+</html>

@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meal Planner</title>
+  <link rel="stylesheet" href="../../shared/base.css" />
+  <script src="../../shared/theme.js"></script>
+
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 0.6rem;
+      gap: 0;
+      overflow: hidden;
+    }
+
+    /* ── Week nav ────────────────────────────────────── */
+    .week-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      padding: 0.2rem 0 0.4rem;
+      flex-shrink: 0;
+    }
+
+    .week-nav-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--color-text-muted);
+      font-size: 1rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+    .week-nav-btn:hover { color: var(--color-text); }
+
+    .week-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--color-text);
+      min-width: 120px;
+      text-align: center;
+    }
+
+    /* ── Meal grid ───────────────────────────────────── */
+    .meal-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 32px repeat(7, 1fr);
+      grid-template-rows: auto repeat(3, 1fr);
+      gap: 2px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .day-header {
+      font-size: 0.52rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      text-align: center;
+      padding: 0.2rem 0;
+    }
+    .day-header.today {
+      color: var(--color-accent);
+      font-weight: 800;
+    }
+
+    .meal-label {
+      font-size: 0.48rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 2px;
+    }
+
+    .meal-cell {
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      padding: 0.2rem 0.25rem;
+      font-size: 0.65rem;
+      color: var(--color-text);
+      cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: flex;
+      align-items: flex-start;
+      transition: border-color 0.15s;
+      word-break: break-word;
+      min-height: 0;
+    }
+    .meal-cell:hover { border-color: var(--color-accent); }
+    .meal-cell.empty {
+      color: var(--color-text-muted);
+      opacity: 0.35;
+      font-size: 0.85rem;
+      align-items: center;
+      justify-content: center;
+    }
+    .meal-cell.today-col {
+      border-color: rgba(46, 170, 220, 0.35);
+      background: rgba(46, 170, 220, 0.04);
+    }
+
+    .meal-cell input {
+      width: 100%;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 0.65rem;
+      color: var(--color-text);
+    }
+
+    .corner { /* empty top-left corner */ }
+
+    /* ── Sync indicator ────────────────────────────── */
+    .sync-indicator { display:inline-block; font-size:0.55rem; width:1em; text-align:center; vertical-align:middle; margin-left:4px; }
+    .sync-indicator.syncing { color:var(--color-text-muted); animation:spin 1s linear infinite; }
+    .sync-indicator.synced  { color:#40c463; }
+    .sync-indicator.error   { color:#e74c3c; font-weight:700; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ── Settings panel ────────────────────────────── */
+    .settings-panel { position:fixed; inset:0; background:var(--color-bg,#fff); padding:1rem 1.2rem; display:flex; flex-direction:column; gap:0.8rem; transform:translateY(100%); transition:transform 0.25s ease; z-index:10; overflow-y:auto; }
+    .settings-panel.open { transform:translateY(0); }
+    @media (prefers-color-scheme:dark) { .settings-panel { background:#191a1f; } }
+    html[data-theme="dark"]  .settings-panel { background:#191a1f; }
+    html[data-theme="light"] .settings-panel { background:#fff; }
+
+    .settings-title { font-size:0.82rem; font-weight:700; color:var(--color-text); }
+    .sync-field { display:flex; flex-direction:column; gap:0.3rem; }
+    .sync-field label { font-size:0.62rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-muted); }
+    .sync-field input { padding:0.4em 0.6em; border:1.5px solid var(--color-border); border-radius:6px; font-size:0.78rem; font-family:inherit; color:var(--color-text); background:transparent; outline:none; width:100%; box-sizing:border-box; }
+    .sync-field input:focus { border-color:var(--color-accent); }
+    .webhook-row { display:flex; gap:0.4rem; align-items:flex-end; }
+    .webhook-row input { flex:1; }
+    .btn-test { padding:0.4em 0.8em; background:var(--color-accent); color:#fff; border:none; border-radius:6px; font-size:0.72rem; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .btn-test:hover { opacity:0.85; }
+    .test-result { font-size:0.65rem; min-height:1.1em; color:var(--color-text-muted); }
+    .sync-hint { font-size:0.6rem; color:var(--color-text-muted); opacity:0.7; }
+    .settings-actions { display:flex; justify-content:space-between; align-items:center; margin-top:auto; padding-top:0.3rem; }
+    .btn-save { padding:0.4em 1em; background:var(--color-accent); color:#fff; border:none; border-radius:6px; font-size:0.78rem; font-weight:600; cursor:pointer; }
+    .btn-cancel { background:none; border:none; cursor:pointer; color:var(--color-text-muted); font-size:0.78rem; }
+  </style>
+</head>
+<body>
+
+  <div class="widget-bar">
+    <span id="syncStatus" class="sync-indicator"></span>
+    <button id="gearBtn" title="Settings">⚙</button>
+    <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
+      <span class="theme-switch__icon">☀</span>
+      <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
+      <span class="theme-switch__icon">🌙</span>
+    </button>
+  </div>
+
+  <div class="week-nav">
+    <button class="week-nav-btn" id="prevWeek">‹</button>
+    <span class="week-label" id="weekLabel"></span>
+    <button class="week-nav-btn" id="nextWeek">›</button>
+  </div>
+
+  <div class="meal-grid" id="mealGrid"></div>
+
+  <!-- Settings panel -->
+  <div class="settings-panel" id="settingsPanel">
+    <span class="settings-title">Sync Settings</span>
+    <div class="sync-field">
+      <label>Worker URL</label>
+      <div class="webhook-row">
+        <input type="url" id="syncUrlInput" placeholder="https://your-worker.workers.dev" autocomplete="off" />
+        <button class="btn-test" id="testSyncBtn">Test</button>
+      </div>
+      <div class="test-result" id="testResult"></div>
+      <span class="sync-hint">Sync meal plans across devices via Notion.</span>
+    </div>
+    <div class="settings-actions">
+      <button class="btn-cancel" id="cancelSettingsBtn">Cancel</button>
+      <button class="btn-save" id="saveSettingsBtn">Save</button>
+    </div>
+  </div>
+
+  <script>
+    // ── State ─────────────────────────────────────────
+    const STORE_KEY = 'meals-data';
+    const MEALS = ['breakfast', 'lunch', 'dinner'];
+    const MEAL_LABELS = ['B', 'L', 'D'];
+    const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    let data = { weeks: {} };
+    let currentWeekOffset = 0; // 0 = this week
+
+    function load() {
+      try { data = JSON.parse(localStorage.getItem(STORE_KEY)) || { weeks: {} }; } catch { data = { weeks: {} }; }
+    }
+
+    function save() {
+      localStorage.setItem(STORE_KEY, JSON.stringify(data));
+      pushToNotion();
+    }
+
+    function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // ── Date helpers ─────────────────────────────────
+    function getMonday(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      d.setDate(diff);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+
+    function isoDate(d) { return d.toISOString().slice(0, 10); }
+
+    function getWeekKey(monday) {
+      // ISO week: year-Www
+      const d = new Date(monday);
+      d.setDate(d.getDate() + 3);
+      const yearStart = new Date(d.getFullYear(), 0, 1);
+      const weekNo = Math.ceil(((d - yearStart) / 86400000 + yearStart.getDay() + 1) / 7);
+      return `${d.getFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+    }
+
+    function getWeekDates(offset) {
+      const today = new Date();
+      const monday = getMonday(today);
+      monday.setDate(monday.getDate() + offset * 7);
+      const dates = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(d.getDate() + i);
+        dates.push(d);
+      }
+      return dates;
+    }
+
+    function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+    // ── Render ────────────────────────────────────────
+    function render() {
+      const grid = document.getElementById('mealGrid');
+      const dates = getWeekDates(currentWeekOffset);
+      const weekKey = getWeekKey(dates[0]);
+      const todayS = todayStr();
+
+      // Ensure week data exists
+      if (!data.weeks[weekKey]) data.weeks[weekKey] = {};
+
+      // Week label
+      const startStr = dates[0].toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      const endStr   = dates[6].toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      document.getElementById('weekLabel').textContent = `${startStr} – ${endStr}`;
+
+      let html = '';
+
+      // Header row: corner + 7 day headers
+      html += '<div class="corner"></div>';
+      dates.forEach((d, i) => {
+        const isToday = isoDate(d) === todayS;
+        html += `<div class="day-header${isToday ? ' today' : ''}">${DAY_NAMES[i]}<br>${d.getDate()}</div>`;
+      });
+
+      // 3 meal rows
+      MEALS.forEach((meal, mi) => {
+        html += `<div class="meal-label">${MEAL_LABELS[mi]}</div>`;
+        dates.forEach(d => {
+          const dateKey = isoDate(d);
+          const isToday = dateKey === todayS;
+          const weekData = data.weeks[weekKey] || {};
+          const dayData = weekData[dateKey] || {};
+          const value = dayData[meal] || '';
+
+          html += `<div class="meal-cell${value ? '' : ' empty'}${isToday ? ' today-col' : ''}" data-week="${weekKey}" data-date="${dateKey}" data-meal="${meal}">${value ? esc(value) : '+'}</div>`;
+        });
+      });
+
+      grid.innerHTML = html;
+
+      // Bind cell clicks
+      grid.querySelectorAll('.meal-cell').forEach(cell => {
+        cell.addEventListener('click', () => startCellEdit(cell));
+      });
+    }
+
+    function startCellEdit(cell) {
+      const { week, date, meal } = cell.dataset;
+      if (!data.weeks[week]) data.weeks[week] = {};
+      if (!data.weeks[week][date]) data.weeks[week][date] = {};
+
+      const current = data.weeks[week][date][meal] || '';
+      cell.classList.remove('empty');
+      cell.innerHTML = '';
+
+      const input = document.createElement('input');
+      input.value = current;
+      input.placeholder = 'meal…';
+      cell.appendChild(input);
+      input.focus();
+      input.select();
+
+      const commit = () => {
+        const val = input.value.trim();
+        data.weeks[week][date][meal] = val;
+        // Clean up empty entries
+        if (!val) delete data.weeks[week][date][meal];
+        if (Object.keys(data.weeks[week][date]).length === 0) delete data.weeks[week][date];
+        if (Object.keys(data.weeks[week]).length === 0) delete data.weeks[week];
+        save();
+        render();
+      };
+
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        if (e.key === 'Escape') render();
+      });
+    }
+
+    // ── Week navigation ──────────────────────────────
+    document.getElementById('prevWeek').addEventListener('click', () => { currentWeekOffset--; render(); });
+    document.getElementById('nextWeek').addEventListener('click', () => { currentWeekOffset++; render(); });
+
+    // ── Settings ─────────────────────────────────────
+    document.getElementById('gearBtn').addEventListener('click', () => {
+      document.getElementById('syncUrlInput').value = syncUrl;
+      document.getElementById('testResult').textContent = '';
+      document.getElementById('settingsPanel').classList.add('open');
+    });
+
+    document.getElementById('cancelSettingsBtn').addEventListener('click', () => {
+      document.getElementById('settingsPanel').classList.remove('open');
+    });
+
+    document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+      syncUrl = document.getElementById('syncUrlInput').value.trim();
+      localStorage.setItem('meals-sync-url', syncUrl);
+      document.getElementById('settingsPanel').classList.remove('open');
+      if (syncUrl) syncFromNotion();
+      renderSyncIndicator();
+    });
+
+    // ── Sync ─────────────────────────────────────────
+    let syncUrl   = localStorage.getItem('meals-sync-url') || '';
+    let syncState = 'idle';
+
+    function renderSyncIndicator() {
+      const el = document.getElementById('syncStatus');
+      if (!el) return;
+      if (!syncUrl) { el.className = 'sync-indicator'; el.textContent = ''; return; }
+      if (syncState === 'syncing') { el.className = 'sync-indicator syncing'; el.textContent = '↻'; }
+      else if (syncState === 'synced') { el.className = 'sync-indicator synced'; el.textContent = '✓'; }
+      else if (syncState === 'error') { el.className = 'sync-indicator error'; el.textContent = '!'; }
+      else { el.className = 'sync-indicator'; el.textContent = ''; }
+    }
+
+    // Only sync a 5-week window to stay within Notion's 2000-char rich_text limit
+    function getSyncPayload() {
+      const dates = getWeekDates(0); // this week's monday
+      const monday = getMonday(new Date());
+      const windowWeeks = {};
+
+      for (let off = -2; off <= 2; off++) {
+        const m = new Date(monday);
+        m.setDate(m.getDate() + off * 7);
+        const wk = getWeekKey(m);
+        if (data.weeks[wk]) windowWeeks[wk] = data.weeks[wk];
+      }
+
+      return { weeks: windowWeeks };
+    }
+
+    async function syncFromNotion() {
+      if (!syncUrl) return;
+      syncState = 'syncing'; renderSyncIndicator();
+      try {
+        const res = await fetch(syncUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'config-load', key: 'meals' }),
+        });
+        const json = await res.json();
+        if (json.ok && json.data && json.data.weeks) {
+          // Merge remote weeks into local (remote wins for overlapping weeks)
+          Object.assign(data.weeks, json.data.weeks);
+          localStorage.setItem(STORE_KEY, JSON.stringify(data));
+          render();
+        }
+        syncState = 'synced';
+      } catch { syncState = 'error'; }
+      renderSyncIndicator();
+    }
+
+    let _pushTimer;
+    async function pushToNotion() {
+      if (!syncUrl) return;
+      clearTimeout(_pushTimer);
+      _pushTimer = setTimeout(async () => {
+        syncState = 'syncing'; renderSyncIndicator();
+        try {
+          await fetch(syncUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'config-save', key: 'meals', data: getSyncPayload() }),
+          });
+          syncState = 'synced';
+        } catch { syncState = 'error'; }
+        renderSyncIndicator();
+      }, 500);
+    }
+
+    document.getElementById('testSyncBtn').addEventListener('click', async () => {
+      const url = document.getElementById('syncUrlInput').value.trim();
+      const rEl = document.getElementById('testResult');
+      if (!url) { rEl.textContent = 'Enter a URL first'; return; }
+      rEl.textContent = 'Testing…';
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'config-load', key: 'meals' }),
+        });
+        const j = await r.json();
+        rEl.textContent = j.ok ? '✓ Connected' + (j.data ? ' — data found' : ' — no data yet') : '✗ ' + (j.error || 'Error');
+        rEl.style.color = j.ok ? '#40c463' : '#e74c3c';
+      } catch (e) { rEl.textContent = '✗ ' + e.message; rEl.style.color = '#e74c3c'; }
+    });
+
+    // ── Init ──────────────────────────────────────────
+    load();
+    render();
+    renderSyncIndicator();
+    if (syncUrl) syncFromNotion();
+  </script>
+</body>
+</html>
