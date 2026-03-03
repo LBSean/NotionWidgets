@@ -824,14 +824,30 @@
         });
         const json = await res.json();
         if (json.ok && json.data && json.data.categories) {
-          const remoteTime = json.data.lastModified || 0;
-          const localTime = cfg.lastModified || 0;
-          if (remoteTime >= localTime) {
+          const localCustom = !isDefaultCfg(cfg);
+          const remoteCustom = !isDefaultCfg(json.data);
+
+          if (localCustom && !remoteCustom) {
+            // Local has custom labels, remote is defaults → push local
+            cfg.lastModified = cfg.lastModified || Date.now();
+            saveCfg(cfg);
+            pushCfgToNotion();
+          } else if (!localCustom && remoteCustom) {
+            // Remote has custom labels, local is defaults → use remote
             cfg = json.data;
             saveCfg(cfg);
             activeFilters = new Set(cfg.categories.map(c => c.id));
           } else {
-            pushCfgToNotion();
+            // Both custom or both default → use timestamps
+            const remoteTime = json.data.lastModified || 0;
+            const localTime = cfg.lastModified || 0;
+            if (remoteTime > localTime) {
+              cfg = json.data;
+              saveCfg(cfg);
+              activeFilters = new Set(cfg.categories.map(c => c.id));
+            } else if (localTime > remoteTime) {
+              pushCfgToNotion();
+            }
           }
           return true;
         }
