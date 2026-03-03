@@ -809,7 +809,7 @@
     }
 
     async function syncCfgFromNotion() {
-      if (!syncUrl) return;
+      if (!syncUrl) return false;
       try {
         const res = await fetch(syncUrl, {
           method: 'POST',
@@ -821,8 +821,10 @@
           cfg = json.data;
           saveCfg(cfg);
           activeFilters = new Set(cfg.categories.map(c => c.id));
+          return true;
         }
       } catch {}
+      return false;
     }
 
     // ─── Rendering ──────────────────────────────────
@@ -1200,7 +1202,8 @@
     activeFilters = new Set(cfg.categories.map(c => c.id));
     render();
     if (syncUrl) {
-      syncCfgFromNotion().then(() => {
+      syncCfgFromNotion().then((found) => {
+        if (!found) pushCfgToNotion();
         render(); // re-render with synced categories
         syncFromNotion(viewYear);
       });
