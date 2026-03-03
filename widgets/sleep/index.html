@@ -6,6 +6,8 @@
   <title>Sleep Log</title>
   <link rel="stylesheet" href="../../shared/base.css" />
   <script src="../../shared/theme.js"></script>
+  <script>var SYNC_URL=''</script>
+  <script src="../../shared/config.js"></script>
 
   <style>
     body {
@@ -613,7 +615,7 @@
     });
 
     // ── Sync ─────────────────────────────────────────
-    let syncUrl   = localStorage.getItem('sleep-sync-url') || '';
+    let syncUrl   = localStorage.getItem('sleep-sync-url') || SYNC_URL || '';
     let syncState = 'idle';
 
     function renderSyncIndicator() {

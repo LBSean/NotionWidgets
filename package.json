@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "Free, open-source embeddable widgets for Notion — fork and self-host your own",
   "scripts": {
-    "dev": "live-server --port=3000 --open=index.html",
+    "dev": "node scripts/build-config.js && live-server --port=3000 --open=index.html",
     "preview": "live-server --port=3000",
-    "setup": "node scripts/setup-notion.js"
+    "setup": "node scripts/setup-notion.js",
+    "build": "node scripts/build-config.js"
   },
   "dependencies": {
     "@notionhq/client": "^2.2.0"

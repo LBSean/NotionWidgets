@@ -6,6 +6,8 @@
   <title>Pomodoro Timer</title>
   <link rel="stylesheet" href="../../shared/base.css" />
   <script src="../../shared/theme.js"></script>
+  <script>var SYNC_URL=''</script>
+  <script src="../../shared/config.js"></script>
 
   <style>
     /* ── Mode colour tokens ───────────────────────────────────── */
@@ -536,7 +538,7 @@
     const DEFAULTS = {
       work: 25, short: 5, long: 15, sessions: 4,
       microEn: false, microInt: 60, microDur: 5,
-      webhook: '', label: '',
+      webhook: SYNC_URL || '', label: '',
     };
     let cfg = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('pomo-cfg') || '{}') };
 

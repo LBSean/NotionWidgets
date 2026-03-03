@@ -37,10 +37,14 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
+      - name: Generate config
+        run: node scripts/build-config.js
+        env:
+          SYNC_URL: ${{ secrets.SYNC_URL }}
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload the entire repo (no build step needed — pure HTML/CSS/JS)
           path: '.'
 
       - name: Deploy to GitHub Pages

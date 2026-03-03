@@ -135,11 +135,25 @@ https://notion-widgets-webhook.<your-subdomain>.workers.dev
 
 > **Tip:** You can also use `npx wrangler` instead of installing globally.
 
-### Step 4: Connect Your Widgets
+### Step 4: Set the Sync URL
 
-Open any widget → **⚙ Settings** → paste your Worker URL → **Test** → **Save**.
+The worker URL is injected at build time via the `SYNC_URL` environment variable so all widgets connect automatically — no per-widget configuration needed.
 
-Each widget stores the worker URL independently, so you only need to set it once per widget.
+**Vercel (recommended):**
+In the Vercel dashboard → your project → **Settings → Environment Variables** → add:
+| Name | Value |
+|------|-------|
+| `SYNC_URL` | `https://notion-widgets-webhook.<your-subdomain>.workers.dev` |
+
+Redeploy and every widget will sync out of the box on every device.
+
+**Local development:**
+```bash
+cp shared/config.example.js shared/config.js
+```
+Edit `shared/config.js` and paste your worker URL. This file is git-ignored.
+
+> **Manual override:** You can still paste a different URL per widget via **⚙ Settings → Notion Sync**. A per-widget URL takes priority over the built-in default.
 
 ---
 
@@ -160,7 +174,7 @@ Notion Page
   Your Notion Databases
 ```
 
-- **Frontend:** Pure HTML/CSS/JS — no frameworks, no build step
+- **Frontend:** Pure HTML/CSS/JS — no frameworks, only a tiny config build step
 - **Backend:** Cloudflare Worker acts as a CORS proxy to the Notion API
 - **Storage:** Notion databases (one per widget type)
 - **Offline-first:** localStorage is the primary store; Notion is the sync layer
@@ -217,6 +231,7 @@ All three serve static files — pick whichever you prefer.
 NotionWidgets/
 ├── .github/workflows/deploy.yml    ← GitHub Pages auto-deploy
 ├── scripts/setup-notion.js         ← Automated database setup
+├── scripts/build-config.js        ← Generates shared/config.js from SYNC_URL env var
 ├── webhook/
 │   ├── worker.js                   ← Cloudflare Worker (Notion proxy)
 │   ├── wrangler.toml               ← Worker config
@@ -238,7 +253,9 @@ NotionWidgets/
 │   └── sleep/
 ├── shared/
 │   ├── base.css                    ← Shared resets + CSS variables
-│   └── theme.js                    ← Light/dark theme toggle
+│   ├── theme.js                    ← Light/dark theme toggle
+│   ├── config.example.js           ← Sync URL template (copy to config.js)
+│   └── config.js                   ← Your sync URL (git-ignored, auto-generated on deploy)
 ├── index.html                      ← Widget gallery
 ├── vercel.json                     ← Vercel deploy config
 ├── package.json

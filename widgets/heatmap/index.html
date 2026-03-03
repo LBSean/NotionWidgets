@@ -6,6 +6,8 @@
   <title>Habit Tracker</title>
   <link rel="stylesheet" href="../../shared/base.css" />
   <script src="../../shared/theme.js"></script>
+  <script>var SYNC_URL=''</script>
+  <script src="../../shared/config.js"></script>
 
   <style>
     /* ── Layout ─────────────────────────────────── */
@@ -1194,7 +1196,7 @@
     // ─── Init ───────────────────────────────────────
     cfg = loadCfg();
     migrateOldData();
-    try { syncUrl = localStorage.getItem('habits-sync-url') || ''; } catch {}
+    try { syncUrl = localStorage.getItem('habits-sync-url') || SYNC_URL || ''; } catch {}
     activeFilters = new Set(cfg.categories.map(c => c.id));
     render();
     if (syncUrl) {
