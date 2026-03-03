@@ -797,6 +797,12 @@
     }
 
     // ─── Category sync (labels/colors) ─────────────
+    function isDefaultCfg(c) {
+      const dNames = DEFAULT_CATS.map(x => x.name).sort().join(',');
+      const cNames = (c.categories || []).map(x => x.name).sort().join(',');
+      return dNames === cNames;
+    }
+
     async function pushCfgToNotion() {
       if (!syncUrl) return;
       try {
@@ -818,9 +824,15 @@
         });
         const json = await res.json();
         if (json.ok && json.data && json.data.categories) {
-          cfg = json.data;
-          saveCfg(cfg);
-          activeFilters = new Set(cfg.categories.map(c => c.id));
+          const remoteTime = json.data.lastModified || 0;
+          const localTime = cfg.lastModified || 0;
+          if (remoteTime >= localTime) {
+            cfg = json.data;
+            saveCfg(cfg);
+            activeFilters = new Set(cfg.categories.map(c => c.id));
+          } else {
+            pushCfgToNotion();
+          }
           return true;
         }
       } catch {}
@@ -1147,6 +1159,7 @@
         if (name) nc.push({ id: tempCats[i].id, name, color });
       });
       cfg.categories = nc;
+      cfg.lastModified = Date.now();
       saveCfg(cfg);
       syncUrl = document.getElementById('syncUrlInput').value.trim();
       try { localStorage.setItem('habits-sync-url', syncUrl); } catch {}
@@ -1203,7 +1216,7 @@
     render();
     if (syncUrl) {
       syncCfgFromNotion().then((found) => {
-        if (!found) pushCfgToNotion();
+        if (!found && !isDefaultCfg(cfg)) pushCfgToNotion();
         render(); // re-render with synced categories
         syncFromNotion(viewYear);
       });
