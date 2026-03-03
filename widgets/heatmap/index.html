@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Habit Tracker</title>
   <link rel="stylesheet" href="../../shared/base.css" />
+  <link rel="stylesheet" href="../../shared/sync.css" />
   <script src="../../shared/theme.js"></script>
   <script>var SYNC_URL=''</script>
   <script src="../../shared/config.js"></script>
+  <script src="../../shared/sync.js"></script>
 
   <style>
     /* ── Layout ─────────────────────────────────── */
@@ -518,12 +520,6 @@
       flex-wrap: wrap;
       gap: 0.3rem;
     }
-    /* ── Sync indicator ── */
-    .sync-indicator { display: inline-block; font-size: 0.55rem; width: 1em; text-align: center; vertical-align: middle; margin-left: 4px; }
-    .sync-indicator.syncing { color: var(--color-text-muted); animation: spin 1s linear infinite; }
-    .sync-indicator.synced  { color: #40c463; }
-    .sync-indicator.error   { color: #e74c3c; font-weight: 700; }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     /* ── Sync settings ── */
     .sync-hint { font-size: 0.6rem; color: var(--color-text-muted); line-height: 1.5; margin-bottom: 0.4rem; }
     .sync-hint code { background: var(--color-border); padding: 1px 4px; border-radius: 3px; font-size: 0.55rem; }
@@ -550,7 +546,7 @@
       <button data-view="week">W</button>
     </div>
     <button id="gearBtn" title="Settings" aria-label="Settings">⚙</button>
-    <span id="syncStatus" class="sync-indicator"></span>
+    <span id="syncStatus" class="sync-ind"></span>
     <button class="theme-switch" onclick="__toggleTheme()" title="Toggle theme" aria-label="Toggle theme">
       <span class="theme-switch__icon">☀</span>
       <span class="theme-switch__track"><span class="theme-switch__thumb"></span></span>
@@ -614,7 +610,7 @@
     let cfg, viewMode = 'year', viewYear = new Date().getFullYear();
     let viewMonth = new Date().getMonth(), viewWeekStart = null;
     let activeFilters = new Set();
-    let syncUrl = '', syncState = 'idle';
+    const sync = WidgetSync.init({ name: 'habits', key: 'heatmap', indicatorEl: '#syncStatus' });
 
     // ─── DOM refs ───────────────────────────────────
     const root          = document.getElementById('root');
@@ -655,28 +651,12 @@
     }
 
     // ─── Notion Sync ──────────────────────────────────
-    function renderSyncIndicator() {
-      const el = document.getElementById('syncStatus');
-      if (!el) return;
-      if (!syncUrl) { el.textContent = ''; el.className = 'sync-indicator'; return; }
-      if (syncState === 'syncing')    { el.textContent = '\u21BB'; el.title = 'Syncing\u2026'; el.className = 'sync-indicator syncing'; }
-      else if (syncState === 'synced') { el.textContent = '\u2713'; el.title = 'Synced'; el.className = 'sync-indicator synced'; }
-      else if (syncState === 'error')  { el.textContent = '!'; el.title = 'Sync error \u2014 check console'; el.className = 'sync-indicator error'; }
-      else { el.textContent = ''; el.className = 'sync-indicator'; }
-    }
-
     async function syncFromNotion(year) {
-      if (!syncUrl) return;
-      syncState = 'syncing'; renderSyncIndicator();
+      if (!sync.url) return;
+      sync.setState('syncing');
       try {
-        const res = await fetch(syncUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'habits-sync', year }),
-        });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const json = await res.json();
-        if (!json.ok) throw new Error(json.message || json.error || 'Sync failed');
+        const json = await sync.send({ action: 'habits-sync', year });
+        if (!json || !json.ok) throw new Error((json && json.message) || 'Sync failed');
 
         const local = loadData(year);
         const remote = json.entries || {};
@@ -685,36 +665,28 @@
           if (!v || typeof v !== 'object' || Object.keys(v).length === 0) delete merged[k];
         }
         saveData(year, merged);
-        syncState = 'synced';
+        sync.setState('synced');
       } catch (err) {
         console.warn('Habits sync failed:', err);
-        syncState = 'error';
+        sync.setState('error');
       }
-      renderSyncIndicator();
       render();
     }
 
     async function pushToNotion(dateKey, dayData) {
-      if (!syncUrl) return;
-      syncState = 'syncing'; renderSyncIndicator();
+      if (!sync.url) return;
+      sync.setState('syncing');
       const summary = cfg.categories
         .filter(c => dayData && dayData[c.id] > 0)
         .map(c => c.name).join(', ');
       try {
-        const res = await fetch(syncUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'habits-save', date: dateKey, data: dayData || {}, summary }),
-        });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const json = await res.json();
-        if (!json.ok) throw new Error(json.message || json.error);
-        syncState = 'synced';
+        const json = await sync.send({ action: 'habits-save', date: dateKey, data: dayData || {}, summary });
+        if (!json || !json.ok) throw new Error((json && json.message) || json.error);
+        sync.setState('synced');
       } catch (err) {
         console.warn('Habits push failed:', err);
-        syncState = 'error';
+        sync.setState('error');
       }
-      renderSyncIndicator();
     }
 
     // ─── Helpers ────────────────────────────────────
@@ -804,55 +776,23 @@
     }
 
     async function pushCfgToNotion() {
-      if (!syncUrl) return;
-      try {
-        await fetch(syncUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'config-save', key: 'heatmap', data: cfg }),
-        });
-      } catch {}
+      await sync.pushNow(cfg);
     }
 
     async function syncCfgFromNotion() {
-      if (!syncUrl) return false;
-      try {
-        const res = await fetch(syncUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'config-load', key: 'heatmap' }),
-        });
-        const json = await res.json();
-        if (json.ok && json.data && json.data.categories) {
-          const localCustom = !isDefaultCfg(cfg);
-          const remoteCustom = !isDefaultCfg(json.data);
-
-          if (localCustom && !remoteCustom) {
-            // Local has custom labels, remote is defaults → push local
-            cfg.lastModified = cfg.lastModified || Date.now();
-            saveCfg(cfg);
-            pushCfgToNotion();
-          } else if (!localCustom && remoteCustom) {
-            // Remote has custom labels, local is defaults → use remote
-            cfg = json.data;
-            saveCfg(cfg);
-            activeFilters = new Set(cfg.categories.map(c => c.id));
-          } else {
-            // Both custom or both default → use timestamps
-            const remoteTime = json.data.lastModified || 0;
-            const localTime = cfg.lastModified || 0;
-            if (remoteTime > localTime) {
-              cfg = json.data;
-              saveCfg(cfg);
-              activeFilters = new Set(cfg.categories.map(c => c.id));
-            } else if (localTime > remoteTime) {
-              pushCfgToNotion();
-            }
-          }
-          return true;
-        }
-      } catch {}
-      return false;
+      const remote = await sync.pull();
+      if (!remote || !remote.categories) return false;
+      const v = WidgetSync.resolve(cfg, remote, isDefaultCfg);
+      if (v.action === 'use-remote') {
+        cfg = remote;
+        saveCfg(cfg);
+        activeFilters = new Set(cfg.categories.map(c => c.id));
+      } else if (v.action === 'use-local') {
+        cfg.lastModified = cfg.lastModified || Date.now();
+        saveCfg(cfg);
+        pushCfgToNotion();
+      }
+      return true;
     }
 
     // ─── Rendering ──────────────────────────────────
@@ -867,7 +807,6 @@
       else if (viewMode === 'month') renderMonth();
       else renderWeek();
       updateViewBtns();
-      renderSyncIndicator();
     }
 
     function headerHTML() {
@@ -1055,7 +994,7 @@
     function openSettings() {
       tempCats = cfg.categories.map(c => ({ ...c }));
       renderCatList();
-      document.getElementById('syncUrlInput').value = syncUrl;
+      document.getElementById('syncUrlInput').value = sync.url;
       document.getElementById('syncTestResult').textContent = '';
       settingsPanel.classList.add('open');
     }
@@ -1107,8 +1046,8 @@
       }
       // Navigation
       const act = e.target.closest('[data-act]')?.dataset.act;
-      if (act === 'py') { viewYear--; render(); if (syncUrl) syncFromNotion(viewYear); }
-      else if (act === 'ny') { viewYear++; render(); if (syncUrl) syncFromNotion(viewYear); }
+      if (act === 'py') { viewYear--; render(); if (sync.url) syncFromNotion(viewYear); }
+      else if (act === 'ny') { viewYear++; render(); if (sync.url) syncFromNotion(viewYear); }
       else if (act === 'pm') { viewMonth--; if (viewMonth < 0) { viewMonth = 11; viewYear--; } render(); }
       else if (act === 'nm') { viewMonth++; if (viewMonth > 11) { viewMonth = 0; viewYear++; } render(); }
       else if (act === 'pw') { viewWeekStart.setDate(viewWeekStart.getDate() - 7); viewYear = viewWeekStart.getFullYear(); render(); }
@@ -1154,7 +1093,7 @@
 
     // Refresh/sync button
     document.getElementById('refreshSyncBtn').addEventListener('click', () => {
-      if (syncUrl) {
+      if (sync.url) {
         syncCfgFromNotion().then(() => syncFromNotion(viewYear));
       }
     });
@@ -1177,12 +1116,11 @@
       cfg.categories = nc;
       cfg.lastModified = Date.now();
       saveCfg(cfg);
-      syncUrl = document.getElementById('syncUrlInput').value.trim();
-      try { localStorage.setItem('habits-sync-url', syncUrl); } catch {}
+      sync.saveUrl(document.getElementById('syncUrlInput').value.trim());
       activeFilters = new Set(cfg.categories.map(c => c.id));
       closeSettings();
       render();
-      if (syncUrl) { pushCfgToNotion(); syncFromNotion(viewYear); }
+      if (sync.url) { pushCfgToNotion(); syncFromNotion(viewYear); }
     });
     document.getElementById('catList').addEventListener('click', e => {
       const btn = e.target.closest('.cat-del');
@@ -1195,24 +1133,9 @@
       const res_el = document.getElementById('syncTestResult');
       if (!url) { res_el.className = 'test-result err'; res_el.textContent = 'Enter a URL first'; return; }
       this.disabled = true;
-      res_el.className = 'test-result'; res_el.textContent = 'Testing\u2026';
-      try {
-        const r = await fetch(url, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'habits-sync', year: new Date().getFullYear() }),
-        });
-        const json = await r.json().catch(() => ({}));
-        if (r.ok && json.ok) {
-          const count = json.entries ? Object.keys(json.entries).length : 0;
-          res_el.className = 'test-result ok';
-          res_el.textContent = `OK \u2014 ${count} day(s) found in Notion`;
-        } else {
-          res_el.className = 'test-result err';
-          res_el.textContent = json.message || json.error || `HTTP ${r.status}`;
-        }
-      } catch (err) {
-        res_el.className = 'test-result err'; res_el.textContent = err.message;
-      }
+      const res = await WidgetSync.testConnection(url, { action: 'habits-sync', year: new Date().getFullYear() });
+      res_el.className = 'test-result ' + (res.ok ? 'ok' : 'err');
+      res_el.textContent = res.message;
       this.disabled = false;
     });
 
@@ -1227,13 +1150,12 @@
     // ─── Init ───────────────────────────────────────
     cfg = loadCfg();
     migrateOldData();
-    try { syncUrl = localStorage.getItem('habits-sync-url') || SYNC_URL || ''; } catch {}
     activeFilters = new Set(cfg.categories.map(c => c.id));
     render();
-    if (syncUrl) {
+    if (sync.url) {
       syncCfgFromNotion().then((found) => {
         if (!found && !isDefaultCfg(cfg)) pushCfgToNotion();
-        render(); // re-render with synced categories
+        render();
         syncFromNotion(viewYear);
       });
     }

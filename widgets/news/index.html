@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>News</title>
   <link rel="stylesheet" href="../../shared/base.css" />
+  <link rel="stylesheet" href="../../shared/sync.css" />
   <script src="../../shared/theme.js"></script>
   <script>var SYNC_URL=''</script>
   <script src="../../shared/config.js"></script>
+  <script src="../../shared/sync.js"></script>
   <style>
     body {
       display: flex;
@@ -233,11 +235,6 @@
     }
 
     /* ── Sync ──────────────────────────────────────── */
-    .sync-indicator { display:inline-block; font-size:0.55rem; width:1em; text-align:center; vertical-align:middle; margin-left:4px; }
-    .sync-indicator.syncing { color:var(--color-text-muted); animation:spin 1s linear infinite; }
-    .sync-indicator.synced  { color:#40c463; }
-    .sync-indicator.error   { color:#e74c3c; font-weight:700; }
-    @keyframes spin { to { transform:rotate(360deg); } }
     .sync-section { border-top:1px solid var(--color-border); padding-top:0.6rem; margin-top:0.2rem; }
     .sync-section-title { font-size:var(--font-size-xs); font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-muted); margin-bottom:0.35rem; }
     .sync-field input { padding:0.35rem 0.6rem; border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-surface); color:var(--color-text); font-size:var(--font-size-xs); font-family:inherit; outline:none; width:100%; box-sizing:border-box; }
@@ -252,7 +249,7 @@
 <body>
 
   <div class="widget-bar">
-    <span id="syncStatus" class="sync-indicator"></span>
+    <span id="syncStatus" class="sync-ind"></span>
     <button id="refreshBtn" title="Refresh">↺</button>
     <button id="gearBtn" title="Settings">⚙</button>
     <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
@@ -565,7 +562,7 @@
       document.getElementById('perPageSlider').value = cfg.perPage;
       document.getElementById('perPageVal').textContent = cfg.perPage;
       document.getElementById('saveStatus').textContent = '';
-      document.getElementById('syncUrlInput').value = syncUrl;
+      document.getElementById('syncUrlInput').value = sync.url;
       document.getElementById('testResult').textContent = '';
       panel.classList.add('open');
     };
@@ -583,85 +580,54 @@
       cfg.feeds  = [0,1,2].map(i => (document.getElementById(`feed${i}`)?.value.trim() || ''));
       cfg.perPage = parseInt(document.getElementById('perPageSlider').value, 10);
       saveCfg();
-      // Save sync URL
-      syncUrl = document.getElementById('syncUrlInput').value.trim();
-      localStorage.setItem('news-sync-url', syncUrl);
+      sync.saveUrl(document.getElementById('syncUrlInput').value.trim());
       closeSettings();
       pushToNotion();
-      renderSyncIndicator();
       feedData = []; currentFeed = 0;
       await loadAllFeeds(true);
     });
 
     // ── Sync ─────────────────────────────────────────────────────
-    let syncUrl   = localStorage.getItem('news-sync-url') || SYNC_URL || '';
-    let syncState = 'idle';
+    const sync = WidgetSync.init({ name: 'news', key: 'news', indicatorEl: '#syncStatus' });
 
-    function renderSyncIndicator() {
-      const el = document.getElementById('syncStatus');
-      if (!el) return;
-      if (!syncUrl) { el.className = 'sync-indicator'; el.textContent = ''; return; }
-      if (syncState === 'syncing') { el.className = 'sync-indicator syncing'; el.textContent = '↻'; }
-      else if (syncState === 'synced') { el.className = 'sync-indicator synced'; el.textContent = '✓'; }
-      else if (syncState === 'error') { el.className = 'sync-indicator error'; el.textContent = '!'; }
-      else { el.className = 'sync-indicator'; el.textContent = ''; }
+    const DEFAULT_FEED_HOSTS = ['feeds.bbci.co.uk', 'feeds.apnews.com', 'theguardian.com'];
+    function isDefault(d) {
+      if (!d || !d.feeds) return true;
+      const hosts = d.feeds.filter(Boolean).map(u => { try { return new URL(u).hostname; } catch(e) { return ''; } });
+      return hosts.length <= 3 && DEFAULT_FEED_HOSTS.every(h => hosts.some(f => f.indexOf(h) >= 0)) && d.perPage === 5;
     }
 
     async function syncFromNotion() {
-      if (!syncUrl) return;
-      syncState = 'syncing'; renderSyncIndicator();
-      try {
-        const res = await fetch(syncUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'config-load', key: 'news' }),
-        });
-        const json = await res.json();
-        if (json.ok && json.data) {
-          cfg = { ...cfg, ...json.data };
-          while (cfg.feeds.length < 3) cfg.feeds.push('');
-          saveCfg();
-        }
-        syncState = 'synced';
-      } catch { syncState = 'error'; }
-      renderSyncIndicator();
+      const remote = await sync.pull();
+      if (!remote) {
+        if (!isDefault(cfg)) { cfg.lastModified = cfg.lastModified || Date.now(); saveCfg(); sync.pushNow(cfg); }
+        return;
+      }
+      const v = WidgetSync.resolve(cfg, remote, isDefault);
+      if (v.action === 'use-remote') {
+        cfg = { ...cfg, ...remote };
+        while (cfg.feeds.length < 3) cfg.feeds.push('');
+        saveCfg();
+      } else if (v.action === 'use-local') {
+        cfg.lastModified = cfg.lastModified || Date.now(); saveCfg(); sync.pushNow(cfg);
+      }
     }
 
-    async function pushToNotion() {
-      if (!syncUrl) return;
-      syncState = 'syncing'; renderSyncIndicator();
-      try {
-        await fetch(syncUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'config-save', key: 'news', data: cfg }),
-        });
-        syncState = 'synced';
-      } catch { syncState = 'error'; }
-      renderSyncIndicator();
+    function pushToNotion() {
+      cfg.lastModified = Date.now(); saveCfg(); sync.push(cfg);
     }
 
     document.getElementById('testSyncBtn').addEventListener('click', async () => {
-      const url = document.getElementById('syncUrlInput').value.trim();
       const rEl = document.getElementById('testResult');
-      if (!url) { rEl.textContent = 'Enter a URL first'; return; }
-      rEl.textContent = 'Testing…';
-      try {
-        const r = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'config-load', key: 'news' }),
-        });
-        const j = await r.json();
-        rEl.textContent = j.ok ? '✓ Connected' + (j.data ? ' — config found' : ' — no data yet') : '✗ ' + (j.error || 'Error');
-        rEl.style.color = j.ok ? '#40c463' : '#e74c3c';
-      } catch (e) { rEl.textContent = '✗ ' + e.message; rEl.style.color = '#e74c3c'; }
+      const url = document.getElementById('syncUrlInput').value.trim();
+      const res = await WidgetSync.testConnection(url, { action: 'config-load', key: 'news' });
+      rEl.textContent = res.message;
+      rEl.style.color = res.ok ? '#40c463' : '#e74c3c';
     });
 
     // ── Init ─────────────────────────────────────────────────────
     loadCfg();
-    renderSyncIndicator();
-    if (syncUrl) { syncFromNotion().then(() => loadAllFeeds()); }
+    if (sync.url) { syncFromNotion().then(() => loadAllFeeds()); }
     else { loadAllFeeds(); }
   </script>
 </body>

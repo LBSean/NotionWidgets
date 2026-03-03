@@ -7,6 +7,11 @@
 
   <!-- Shared resets + CSS variables -->
   <link rel="stylesheet" href="../../shared/base.css" />
+  <link rel="stylesheet" href="../../shared/sync.css" />
+  <script src="../../shared/theme.js"></script>
+  <script>var SYNC_URL=''</script>
+  <script src="../../shared/config.js"></script>
+  <script src="../../shared/sync.js"></script>
 
   <style>
     /* ── Widget-specific styles ────────────────
@@ -31,11 +36,37 @@
   <div class="widget">
     <!-- Widget markup goes here -->
     <p>Hello from your new widget!</p>
+    <span id="syncInd" class="sync-ind"></span>
   </div>
 
   <script>
     // ── Widget logic ────────────────────────────
     // Keep it self-contained — no external dependencies unless necessary.
+
+    // ── Sync (optional) ─────────────────────────
+    // 1. Create a sync context:
+    //    const sync = WidgetSync.init({ name: 'my-widget', key: 'my-widget', indicatorEl: '#syncInd' });
+    //
+    // 2. Define what "default" data looks like (used for conflict resolution):
+    //    function isDefault(d) { return !d || !d.someField; }
+    //
+    // 3. On init, pull from Notion and resolve conflicts:
+    //    async function syncFromNotion() {
+    //      const remote = await sync.pull();
+    //      if (!remote) {
+    //        if (!isDefault(cfg)) { cfg.lastModified = cfg.lastModified || Date.now(); sync.pushNow(cfg); }
+    //        return;
+    //      }
+    //      const v = WidgetSync.resolve(cfg, remote, isDefault);
+    //      if (v.action === 'use-remote') { cfg = remote; saveCfg(); render(); }
+    //      else if (v.action === 'use-local') { cfg.lastModified = cfg.lastModified || Date.now(); sync.pushNow(cfg); }
+    //    }
+    //
+    // 4. On every save, push with timestamp:
+    //    cfg.lastModified = Date.now(); saveCfg(); sync.push(cfg);
+    //
+    // 5. Test button:
+    //    const res = await WidgetSync.testConnection(url, { action: 'config-load', key: 'my-widget' });
   </script>
 
 </body>

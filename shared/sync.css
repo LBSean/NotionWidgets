@@ -1,0 +1,6 @@
+/* shared/sync.css — sync indicator styles for all widgets */
+.sync-ind { display:inline-block; font-size:0.55rem; width:1em; text-align:center; vertical-align:middle; margin-left:4px; }
+.sync-ind.syncing { color:var(--color-text-muted); animation:sync-spin 1s linear infinite; }
+.sync-ind.synced  { color:#40c463; }
+.sync-ind.error   { color:#e74c3c; font-weight:700; }
+@keyframes sync-spin { to { transform:rotate(360deg); } }

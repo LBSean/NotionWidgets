@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Chore Rotation</title>
   <link rel="stylesheet" href="../../shared/base.css" />
+  <link rel="stylesheet" href="../../shared/sync.css" />
   <script src="../../shared/theme.js"></script>
   <script>var SYNC_URL=''</script>
   <script src="../../shared/config.js"></script>
+  <script src="../../shared/sync.js"></script>
 
   <style>
     body {
@@ -102,13 +104,6 @@
       font-size: 0.78rem;
       padding: 2rem;
     }
-
-    /* ── Sync indicator ────────────────────────────── */
-    .sync-indicator { display:inline-block; font-size:0.55rem; width:1em; text-align:center; vertical-align:middle; margin-left:4px; }
-    .sync-indicator.syncing { color:var(--color-text-muted); animation:spin 1s linear infinite; }
-    .sync-indicator.synced  { color:#40c463; }
-    .sync-indicator.error   { color:#e74c3c; font-weight:700; }
-    @keyframes spin { to { transform:rotate(360deg); } }
 
     /* ── Settings panel ────────────────────────────── */
     .settings-panel { position:fixed; inset:0; background:var(--color-bg,#fff); padding:1rem 1.2rem; display:flex; flex-direction:column; gap:0.7rem; transform:translateY(100%); transition:transform 0.25s ease; z-index:10; overflow-y:auto; }
@@ -222,7 +217,7 @@
 <body>
 
   <div class="widget-bar">
-    <span id="syncStatus" class="sync-indicator"></span>
+    <span id="syncStatus" class="sync-ind"></span>
     <button id="gearBtn" title="Settings">⚙</button>
     <button class="theme-switch" onclick="__toggleTheme()" title="Toggle light/dark" aria-label="Toggle theme">
       <span class="theme-switch__icon">☀</span>
@@ -343,7 +338,7 @@
     function openSettings() {
       editChores = data.chores.map(c => ({ ...c }));
       renderEditList();
-      document.getElementById('syncUrlInput').value = syncUrl;
+      document.getElementById('syncUrlInput').value = sync.url;
       document.getElementById('testResult').textContent = '';
       document.getElementById('settingsPanel').classList.add('open');
     }
@@ -397,89 +392,53 @@
       data.chores = editChores.filter(c => c.name.trim());
       data.chores.forEach(c => { c.name = c.name.trim(); });
 
-      syncUrl = document.getElementById('syncUrlInput').value.trim();
-      localStorage.setItem('chores-sync-url', syncUrl);
+      sync.saveUrl(document.getElementById('syncUrlInput').value.trim());
 
       save();
       document.getElementById('settingsPanel').classList.remove('open');
       render();
-      renderSyncIndicator();
     });
 
     // ── Sync ─────────────────────────────────────────
-    let syncUrl   = localStorage.getItem('chores-sync-url') || SYNC_URL || '';
-    let syncState = 'idle';
+    const sync = WidgetSync.init({ name: 'chores', key: 'chores', indicatorEl: '#syncStatus' });
 
-    function renderSyncIndicator() {
-      const el = document.getElementById('syncStatus');
-      if (!el) return;
-      if (!syncUrl) { el.className = 'sync-indicator'; el.textContent = ''; return; }
-      if (syncState === 'syncing') { el.className = 'sync-indicator syncing'; el.textContent = '↻'; }
-      else if (syncState === 'synced') { el.className = 'sync-indicator synced'; el.textContent = '✓'; }
-      else if (syncState === 'error') { el.className = 'sync-indicator error'; el.textContent = '!'; }
-      else { el.className = 'sync-indicator'; el.textContent = ''; }
+    function isDefault(d) {
+      if (!d || !d.chores) return true;
+      return d.chores.length === 0;
     }
 
     async function syncFromNotion() {
-      if (!syncUrl) return;
-      syncState = 'syncing'; renderSyncIndicator();
-      try {
-        const res = await fetch(syncUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'config-load', key: 'chores' }),
-        });
-        const json = await res.json();
-        if (json.ok && json.data && json.data.chores) {
-          data = json.data;
-          localStorage.setItem(STORE_KEY, JSON.stringify(data));
-          render();
-        }
-        syncState = 'synced';
-      } catch { syncState = 'error'; }
-      renderSyncIndicator();
+      const remote = await sync.pull();
+      if (!remote) {
+        if (!isDefault(data)) { data.lastModified = data.lastModified || Date.now(); localStorage.setItem(STORE_KEY, JSON.stringify(data)); sync.pushNow(data); }
+        return;
+      }
+      const v = WidgetSync.resolve(data, remote, isDefault);
+      if (v.action === 'use-remote' && remote.chores) {
+        data = remote;
+        localStorage.setItem(STORE_KEY, JSON.stringify(data));
+        render();
+      } else if (v.action === 'use-local') {
+        data.lastModified = data.lastModified || Date.now(); localStorage.setItem(STORE_KEY, JSON.stringify(data)); sync.pushNow(data);
+      }
     }
 
-    let _pushTimer;
-    async function pushToNotion() {
-      if (!syncUrl) return;
-      clearTimeout(_pushTimer);
-      _pushTimer = setTimeout(async () => {
-        syncState = 'syncing'; renderSyncIndicator();
-        try {
-          await fetch(syncUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'config-save', key: 'chores', data }),
-          });
-          syncState = 'synced';
-        } catch { syncState = 'error'; }
-        renderSyncIndicator();
-      }, 500);
+    function pushToNotion() {
+      data.lastModified = Date.now(); localStorage.setItem(STORE_KEY, JSON.stringify(data)); sync.push(data);
     }
 
     document.getElementById('testSyncBtn').addEventListener('click', async () => {
-      const url = document.getElementById('syncUrlInput').value.trim();
       const rEl = document.getElementById('testResult');
-      if (!url) { rEl.textContent = 'Enter a URL first'; return; }
-      rEl.textContent = 'Testing…';
-      try {
-        const r = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'config-load', key: 'chores' }),
-        });
-        const j = await r.json();
-        rEl.textContent = j.ok ? '✓ Connected' + (j.data ? ' — data found' : ' — no data yet') : '✗ ' + (j.error || 'Error');
-        rEl.style.color = j.ok ? '#40c463' : '#e74c3c';
-      } catch (e) { rEl.textContent = '✗ ' + e.message; rEl.style.color = '#e74c3c'; }
+      const url = document.getElementById('syncUrlInput').value.trim();
+      const res = await WidgetSync.testConnection(url, { action: 'config-load', key: 'chores' });
+      rEl.textContent = res.message;
+      rEl.style.color = res.ok ? '#40c463' : '#e74c3c';
     });
 
     // ── Init ──────────────────────────────────────────
     load();
     render();
-    renderSyncIndicator();
-    if (syncUrl) syncFromNotion();
+    if (sync.url) syncFromNotion();
   </script>
 </body>
 </html>
