@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"localStorage.setItem\\\\|sessionStorage.setItem\" widgets/*.html)"
+    ]
+  }
+}
